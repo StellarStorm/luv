@@ -20,6 +20,10 @@ build-backend = "hatchling.build"
 dev = [
     "pre-commit>=4.2.0",
 ]
+test = [
+    "pytest>=8.4.1",
+    "pytest-mock>=3.14.1",
+]
 
 [tool.ruff]
 line-length = 80
@@ -34,3 +38,9 @@ skip-string-normalization = true
 [tool.isort]
 profile = "black"
 line_length = 80
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+python_files = ["test_*.py"]
+addopts = "-v"
