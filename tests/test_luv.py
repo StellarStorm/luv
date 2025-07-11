@@ -13,50 +13,8 @@ from luv import (
     LaTeXEnvironment,
     LuvError,
     PackageResolver,
-    SimpleTOMLWriter,
     find_project_root,
 )
-
-
-class TestSimpleTOMLWriter:
-    """Test the SimpleTOMLWriter class."""
-
-    def test_dumps_simple_string(self):
-        data = {'key': 'value'}
-        result = SimpleTOMLWriter.dumps(data)
-        assert result == 'key = "value"'
-
-    def test_dumps_boolean(self):
-        data = {'debug': True, 'production': False}
-        result = SimpleTOMLWriter.dumps(data)
-        assert 'debug = true' in result
-        assert 'production = false' in result
-
-    def test_dumps_number(self):
-        data = {'port': 8080, 'timeout': 30.5}
-        result = SimpleTOMLWriter.dumps(data)
-        assert 'port = 8080' in result
-        assert 'timeout = 30.5' in result
-
-    def test_dumps_array(self):
-        data = {'packages': ['amsmath', 'graphicx']}
-        result = SimpleTOMLWriter.dumps(data)
-        assert 'packages = ["amsmath", "graphicx"]' in result
-
-    def test_dumps_section(self):
-        data = {'project': {'texfile': 'main.tex', 'engine': 'pdflatex'}}
-        result = SimpleTOMLWriter.dumps(data)
-        assert '[project]' in result
-        assert 'texfile = "main.tex"' in result
-        assert 'engine = "pdflatex"' in result
-
-    def test_dumps_mixed_data(self):
-        data = {'debug': True, 'project': {'texfile': 'main.tex', 'port': 8080}}
-        result = SimpleTOMLWriter.dumps(data)
-        assert 'debug = true' in result
-        assert '[project]' in result
-        assert 'texfile = "main.tex"' in result
-        assert 'port = 8080' in result
 
 
 class TestPackageResolver:
@@ -648,3 +606,30 @@ Some text with \\textcolor{red}{colored text}.
         # Should detect patterns for packages we cleared
         suggested = resolver.found_packages
         assert len(suggested) > 0
+
+    def test_config_file_creation_and_reading(self):
+        """Test that config files can be created and read correctly with tomli-w."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            project_root = Path(tmpdir)
+            env = LaTeXEnvironment(project_root)
+
+            # Create environment which should create config file
+            env.create()
+
+            # Verify config file exists and can be read
+            assert env.config_file.exists()
+            config = env.get_config()
+
+            # Check that the config has expected structure
+            assert 'project' in config
+            assert config['project']['texfile'] == 'main.tex'
+            assert config['project']['output_dir'] == 'build'
+            assert config['project']['engine'] == 'pdflatex'
+
+            # Test updating config
+            config['project']['engine'] = 'xelatex'
+            env.update_config(config)
+
+            # Verify the update was persisted
+            updated_config = env.get_config()
+            assert updated_config['project']['engine'] == 'xelatex'

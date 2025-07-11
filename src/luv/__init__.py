@@ -14,48 +14,8 @@ import subprocess
 import sys
 import tomllib
 from pathlib import Path
-from typing import Any
 
-
-class SimpleTOMLWriter:
-    """Simple TOML writer for basic functionality."""
-
-    @staticmethod
-    def dumps(data: dict[str, Any], indent: int = 0) -> str:
-        """Convert dict to TOML format."""
-        lines = []
-        indent_str = '  ' * indent
-
-        # First, write non-dict values
-        for key, value in data.items():
-            if not isinstance(value, dict):
-                if isinstance(value, str):
-                    lines.append(f'{indent_str}{key} = "{value}"')
-                elif isinstance(value, bool):
-                    lines.append(f'{indent_str}{key} = {str(value).lower()}')
-                elif isinstance(value, (int, float)):
-                    lines.append(f'{indent_str}{key} = {value}')
-                elif isinstance(value, list):
-                    # Handle arrays
-                    if all(isinstance(item, str) for item in value):
-                        items = ', '.join(f'"{item}"' for item in value)
-                        lines.append(f'{indent_str}{key} = [{items}]')
-                    else:
-                        items = ', '.join(str(item) for item in value)
-                        lines.append(f'{indent_str}{key} = [{items}]')
-
-        # Then write sections (dicts)
-        for key, value in data.items():
-            if isinstance(value, dict):
-                if indent == 0:
-                    lines.append(f'\n[{key}]')
-                    lines.append(SimpleTOMLWriter.dumps(value, indent + 1))
-                else:
-                    # Nested sections - flatten the key path
-                    lines.append(f'\n{indent_str}[{key}]')
-                    lines.append(SimpleTOMLWriter.dumps(value, indent + 1))
-
-        return '\n'.join(filter(None, lines))
+import tomli_w
 
 
 class PackageResolver:
@@ -405,8 +365,8 @@ class LaTeXEnvironment:
             }
         }
 
-        with open(self.config_file, 'w') as f:
-            f.write(SimpleTOMLWriter.dumps(config))
+        with open(self.config_file, 'wb') as f:
+            tomli_w.dump(config, f)
 
         print(f'Created {self.config_file}')
 
@@ -448,8 +408,8 @@ class LaTeXEnvironment:
 
     def update_config(self, config: dict) -> None:
         """Update configuration in luv.toml."""
-        with open(self.config_file, 'w') as f:
-            f.write(SimpleTOMLWriter.dumps(config))
+        with open(self.config_file, 'wb') as f:
+            tomli_w.dump(config, f)
 
     def get_requirements(self) -> list[str]:
         """Load requirements from latex-requirements.txt."""
