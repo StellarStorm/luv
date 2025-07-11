@@ -59,48 +59,16 @@ class SimpleTOMLWriter:
 
 
 class PackageResolver:
-    """Resolves LaTeX package dependencies from source files."""
+    """Resolves LaTeX package dependencies from source files using tlmgr search."""
 
-    # Mapping from LaTeX package names to TeX Live package names
-    # This handles cases where they differ
-    PACKAGE_NAME_MAPPING = {
-        'algorithmic': 'algorithms',
-        'algorithmicx': 'algorithmicx',
-        'algorithm': 'algorithms',
-        'subfig': 'subfigure',
-        'subfigure': 'subfigure',
-        'subcaption': 'caption',
-        'cleveref': 'cleveref',
-        'natbib': 'natbib',
-        'biblatex': 'biblatex',
-        'hyperref': 'hyperref',
-        'graphicx': 'graphics',
-        'xcolor': 'xcolor',
-        'color': 'graphics',
-        'amsmath': 'amsmath',
-        'amssymb': 'amsfonts',
-        'amsthm': 'amscls',
-        'booktabs': 'booktabs',
-        'longtable': 'tools',
-        'array': 'tools',
-        'multirow': 'multirow',
-        'multicol': 'tools',
-        'fontenc': 'base',
-        'inputenc': 'base',
-        'babel': 'babel',
-        'geometry': 'geometry',
-        'setspace': 'setspace',
-        'fancyhdr': 'fancyhdr',
-        'titlesec': 'titlesec',
-        'enumitem': 'enumitem',
-        'listings': 'listings',
-        'minted': 'minted',
-        'verbatim': 'tools',
-        'tikz': 'pgf',
-        'pgfplots': 'pgfplots',
-        'lipsum': 'lipsum',
-        'blindtext': 'blindtext',
-        'todonotes': 'todonotes',
+    # Only core packages that should be skipped (already part of LaTeX base)
+    CORE_PACKAGES = {
+        'fontenc',
+        'inputenc',
+        'textcomp',
+        'ifthen',
+        'calc',
+        'url',
     }
 
     # Common LaTeX packages and their typical command/environment indicators
@@ -127,14 +95,25 @@ class PackageResolver:
         'array': [r'\\newcolumntype', r'\\arraybackslash'],
         'multirow': [r'\\multirow'],
         'multicol': [r'\\begin\{multicols\}'],
+        'colortbl': [
+            r'\\rowcolor\{',
+            r'\\columncolor\{',
+            r'\\cellcolor\{',
+            r'\\usepackage\[.*table.*\]\{xcolor\}',
+        ],
         # References and citations
         'hyperref': [r'\\href\{', r'\\url\{', r'\\hyperlink', r'\\autoref'],
         'natbib': [r'\\citep\{', r'\\citet\{', r'\\citeauthor'],
-        'biblatex': [r'\\printbibliography', r'\\addbibresource'],
+        # biblatex requires logreq and etoolbox
+        'biblatex': [
+            r'\\printbibliography',
+            r'\\addbibresource',
+            r'\\usepackage.*biblatex',
+        ],
+        'logreq': [r'\\usepackage.*biblatex'],  # biblatex dependency
+        'etoolbox': [r'\\usepackage.*biblatex'],  # biblatex dependency
         'cleveref': [r'\\cref\{', r'\\Cref\{'],
         # Font and encoding
-        'fontenc': [r'\\usepackage\[.*\]\{fontenc\}'],
-        'inputenc': [r'\\usepackage\[.*\]\{inputenc\}'],
         'babel': [r'\\selectlanguage', r'\\foreignlanguage'],
         # Layout and spacing
         'geometry': [r'\\newgeometry', r'\\restoregeometry'],
@@ -158,12 +137,65 @@ class PackageResolver:
         'lipsum': [r'\\lipsum'],
         'blindtext': [r'\\blindtext', r'\\Blindtext'],
         'todonotes': [r'\\todo\{', r'\\missingfigure'],
+        'authblk': [r'\\author\[', r'\\affil\{'],
+        'float': [r'\\newfloat', r'\\floatstyle'],
+        'lineno': [r'\\linenumbers', r'\\modulolinenumbers'],
     }
 
     def __init__(self, project_root: Path):
         self.project_root = project_root
         self.found_packages = set()
         self.explicitly_used = set()
+
+    def resolve_package_name(self, latex_package: str) -> str | None:
+        """Use tlmgr to find the correct TeX Live package name for a LaTeX package."""
+        if latex_package in self.CORE_PACKAGES:
+            return None  # Skip core packages
+
+        try:
+            # Search for the .sty file with leading slash for exact match
+            cmd = [
+                'tlmgr',
+                'search',
+                '--global',
+                '--file',
+                f'/{latex_package}.sty',
+            ]
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, check=False
+            )
+
+            if result.returncode == 0 and result.stdout.strip():
+                lines = result.stdout.strip().split('\n')
+                candidates = []
+
+                for line in lines:
+                    line = line.strip()
+                    # Package names are lines that don't start with whitespace and end with ':'
+                    if line and not line.startswith(' ') and line.endswith(':'):
+                        package_name = line.rstrip(':').strip()
+                        if package_name and package_name not in [
+                            'tlmgr',
+                            'texlive-base',
+                        ]:
+                            # Prefer exact matches or packages with similar names
+                            if (
+                                latex_package.lower() in package_name.lower()
+                                or package_name.lower() in latex_package.lower()
+                            ):
+                                return package_name
+                            candidates.append(package_name)
+
+                # Return first valid candidate if no exact match
+                if candidates:
+                    return candidates[0]
+
+        except FileNotFoundError:
+            # tlmgr not available, return the original name
+            pass
+
+        # If tlmgr search fails, assume package name is correct
+        return latex_package
 
     def resolve_dependencies(self, main_file: str) -> list[str]:
         """Resolve all package dependencies from LaTeX source files."""
@@ -176,17 +208,30 @@ class PackageResolver:
         # Then, scan for usage patterns that suggest additional packages
         self._scan_for_patterns(main_file)
 
-        # Map LaTeX package names to TeX Live package names
+        # Resolve all package names using tlmgr
         all_packages = self.found_packages | self.explicitly_used
-        mapped_packages = set()
+        resolved_packages = set()
+
+        print(f'Resolving {len(all_packages)} packages using tlmgr...')
 
         for package in all_packages:
-            # Use mapping if available, otherwise use original name
-            tex_live_name = self.PACKAGE_NAME_MAPPING.get(package, package)
-            mapped_packages.add(tex_live_name)
+            tex_live_name = self.resolve_package_name(package)
+            if tex_live_name is not None:
+                resolved_packages.add(tex_live_name)
+                if tex_live_name != package:
+                    print(f'  {package} → {tex_live_name}')
 
-        # Return sorted list of unique mapped packages
-        return sorted(list(mapped_packages))
+        # Add automatic dependencies based on detected packages
+        all_packages = self.found_packages | self.explicitly_used
+
+        # biblatex automatically requires these packages
+        if 'biblatex' in all_packages:
+            self.found_packages.add('logreq')
+            self.found_packages.add('etoolbox')
+            print('  Added biblatex dependencies: logreq, etoolbox')
+
+        # Return sorted list of unique resolved packages
+        return sorted(list(resolved_packages))
 
     def _find_explicit_packages(self, main_file: str) -> None:
         """Find packages explicitly declared with \\usepackage."""
@@ -322,6 +367,7 @@ class LaTeXEnvironment:
         self.packages_dir = self.texmf_dir / 'tex' / 'latex'
         self.config_file = project_root / 'luv.toml'
         self.requirements_file = project_root / 'latex-requirements.txt'
+        self._tlmgr_initialized = False
 
     def exists(self) -> bool:
         """Check if the environment exists."""
@@ -438,29 +484,43 @@ class LaTeXEnvironment:
         existing_requirements = self.get_requirements()
         missing_packages = set(packages) - set(existing_requirements)
 
-        print(f'\nFound {len(packages)} packages:')
+        print(f'\nFound {len(packages)} installable packages:')
         if resolver.explicitly_used:
             print('Explicitly declared packages:')
             for pkg in sorted(resolver.explicitly_used):
-                # Show original LaTeX package name but map it for display
-                mapped_name = resolver.PACKAGE_NAME_MAPPING.get(pkg, pkg)
-                status = '✓' if mapped_name in existing_requirements else '!'
-                display = (
-                    f'{pkg} -> {mapped_name}' if pkg != mapped_name else pkg
-                )
-                print(f'  {status} {display}')
+                if pkg not in resolver.CORE_PACKAGES:
+                    resolved_name = resolver.resolve_package_name(pkg)
+                    if resolved_name:
+                        status = (
+                            '✓'
+                            if resolved_name in existing_requirements
+                            else '!'
+                        )
+                        display = (
+                            f'{pkg} → {resolved_name}'
+                            if resolved_name != pkg
+                            else pkg
+                        )
+                        print(f'  {status} {display}')
 
         suggested_packages = resolver.found_packages - resolver.explicitly_used
         if suggested_packages:
             print('\nSuggested packages (based on usage patterns):')
             for pkg in sorted(suggested_packages):
-                # Show original LaTeX package name but map it for display
-                mapped_name = resolver.PACKAGE_NAME_MAPPING.get(pkg, pkg)
-                status = '✓' if mapped_name in existing_requirements else '+'
-                display = (
-                    f'{pkg} -> {mapped_name}' if pkg != mapped_name else pkg
-                )
-                print(f'  {status} {display}')
+                if pkg not in resolver.CORE_PACKAGES:
+                    resolved_name = resolver.resolve_package_name(pkg)
+                    if resolved_name:
+                        status = (
+                            '✓'
+                            if resolved_name in existing_requirements
+                            else '+'
+                        )
+                        display = (
+                            f'{pkg} → {resolved_name}'
+                            if resolved_name != pkg
+                            else pkg
+                        )
+                        print(f'  {status} {display}')
 
         # Show summary of what's missing from requirements
         if missing_packages:
@@ -523,6 +583,10 @@ class LaTeXEnvironment:
         if not self.exists():
             raise LuvError("No environment found. Run 'luv init' first.")
 
+        # Only run init-usertree once per session
+        if self._tlmgr_initialized:
+            return
+
         # Set TEXMFHOME to our local texmf directory
         env = os.environ.copy()
         env['TEXMFHOME'] = str(self.texmf_dir)
@@ -541,16 +605,35 @@ class LaTeXEnvironment:
             if result.returncode != 0 and 'already exists' not in result.stderr:
                 print(f'Warning: tlmgr init-usertree returned: {result.stderr}')
 
+            self._tlmgr_initialized = True
+
         except FileNotFoundError:
             raise LuvError('tlmgr not found. Please install TeX Live first.')
 
-    def install_package(self, package_name: str) -> None:
-        """Install a LaTeX package to the local environment using tlmgr."""
+    def install_package_smart(self, package_name: str) -> bool:
+        """Install a package, with fallback to dynamic resolution if not found."""
         if not self.exists():
             raise LuvError("No environment found. Run 'luv init' first.")
 
         print(f'Installing package: {package_name}')
 
+        # First try direct installation
+        if self._try_install_package(package_name):
+            return True
+
+        # If direct installation failed, try to resolve the package dynamically
+        print(f'Package {package_name} not found, searching for it...')
+        resolved_package = self.resolve_package_name(package_name)
+
+        if resolved_package and resolved_package != package_name:
+            print(f'Found {package_name} in package: {resolved_package}')
+            return self._try_install_package(resolved_package)
+
+        print(f'Could not resolve package for: {package_name}')
+        return False
+
+    def _try_install_package(self, package_name: str) -> bool:
+        """Try to install a package using tlmgr."""
         # Ensure tlmgr user mode is set up
         self._setup_tlmgr_user_mode()
 
@@ -573,62 +656,130 @@ class LaTeXEnvironment:
 
             if result.returncode == 0:
                 print(f'Successfully installed {package_name}')
-                return
+                return True
             elif (
                 'already installed' in result.stdout
                 or 'already installed' in result.stderr
             ):
                 print(f'Package {package_name} is already installed')
-                return
+                return True
 
             # If that failed but package was installed (updmap error), check if files exist
             if 'updmap' in result.stderr and 'install:' in result.stdout:
                 print(
                     f'Package {package_name} installed but font map update failed (this is usually OK)'
                 )
-                return
+                return True
 
-            # If --no-depends-at-all failed for other reasons, try with --no-auto-install
+            # If --no-depends-at-all failed for other reasons, try without special flags
             print(
                 f'Trying alternative installation method for {package_name}...'
             )
-            cmd = [
-                'tlmgr',
-                '--usermode',
-                'install',
-                '--no-auto-install',
-                package_name,
-            ]
+            cmd = ['tlmgr', '--usermode', 'install', package_name]
             result = subprocess.run(
                 cmd, env=env, capture_output=True, text=True, check=False
             )
 
             if result.returncode == 0:
                 print(f'Successfully installed {package_name}')
-                return
+                return True
             elif (
                 'already installed' in result.stdout
                 or 'already installed' in result.stderr
             ):
                 print(f'Package {package_name} is already installed')
-                return
+                return True
             elif 'updmap' in result.stderr and 'install:' in result.stdout:
                 print(
                     f'Package {package_name} installed but font map update failed (this is usually OK)'
                 )
-                return
+                return True
 
-            # If all methods failed, show warning but don't fail completely
+            # Installation failed
+            if 'not present in repository' in result.stderr:
+                return False  # Package not found, try dynamic resolution
+
+            # Other errors
             print(f'Warning: Could not install {package_name}')
             print(f'tlmgr output: {result.stdout}')
             if result.stderr:
                 print(f'tlmgr error: {result.stderr}')
-            print(
-                'Note: Package may already be installed or not available in this TeX Live version.'
-            )
+            return False
 
         except FileNotFoundError:
             raise LuvError('tlmgr not found. Please install TeX Live first.')
+
+    def install_package(self, package_name: str) -> None:
+        """Install a LaTeX package to the local environment using tlmgr with smart resolution."""
+        if not self.exists():
+            raise LuvError("No environment found. Run 'luv init' first.")
+
+        # Use smart installation with dynamic package resolution
+        success = self.install_package_smart(package_name)
+
+        if not success:
+            print(
+                f'Note: Package {package_name} may already be installed or not available in this TeX Live version.'
+            )
+
+    def remove_package(self, package_name: str) -> None:
+        """Remove a LaTeX package from the local environment."""
+        if not self.exists():
+            raise LuvError("No environment found. Run 'luv init' first.")
+
+        print(f'Removing package: {package_name}')
+
+        # Set environment to use our local texmf directory
+        env = os.environ.copy()
+        env['TEXMFHOME'] = str(self.texmf_dir)
+
+        try:
+            # Remove package using tlmgr in user mode
+            cmd = ['tlmgr', '--usermode', 'remove', package_name]
+            result = subprocess.run(
+                cmd, env=env, capture_output=True, text=True, check=False
+            )
+
+            if result.returncode == 0:
+                print(f'Successfully removed {package_name}')
+
+                # Remove from requirements file
+                requirements = self.get_requirements()
+                if package_name in requirements:
+                    updated_requirements = [
+                        pkg for pkg in requirements if pkg != package_name
+                    ]
+
+                    with open(self.requirements_file, 'w') as f:
+                        f.write('# LaTeX package requirements\n')
+                        f.write("# Generated by 'luv resolve'\n\n")
+                        for package in sorted(updated_requirements):
+                            f.write(f'{package}\n')
+
+                    print(f'Removed {package_name} from latex-requirements.txt')
+                return
+            elif (
+                'not installed' in result.stdout
+                or 'not installed' in result.stderr
+            ):
+                print(f'Package {package_name} is not installed')
+                return
+            else:
+                print(f'Warning: Could not remove {package_name}')
+                print(f'tlmgr output: {result.stdout}')
+                if result.stderr:
+                    print(f'tlmgr error: {result.stderr}')
+
+        except FileNotFoundError:
+            raise LuvError('tlmgr not found. Please install TeX Live first.')
+
+    def clean(self) -> None:
+        """Remove the entire LaTeX environment."""
+        if not self.exists():
+            raise LuvError('No environment found to clean')
+
+        shutil.rmtree(self.luv_dir)
+        print(f'Cleaned environment at {self.luv_dir}')
 
     def sync(self) -> None:
         """Install all packages from latex-requirements.txt."""
@@ -1084,9 +1235,22 @@ Project Structure:
     )
 
     # remove command
-    subparsers.add_parser(
+    remove_parser = subparsers.add_parser(
         'remove',
-        help='Remove the local LaTeX environment',
+        help='Remove packages from the local environment',
+        description='Remove one or more packages from latex-requirements.txt and uninstall them from the local environment.',
+    )
+    remove_parser.add_argument(
+        'packages',
+        nargs='+',
+        metavar='PACKAGE',
+        help='One or more LaTeX package names to remove',
+    )
+
+    # clean command
+    subparsers.add_parser(
+        'clean',
+        help='Remove the entire local LaTeX environment',
         description='Delete the .luv/ directory and all locally installed packages. This does not affect luv.toml or latex-requirements.txt.',
     )
 
@@ -1149,28 +1313,46 @@ Project Structure:
                 env.sync()
 
             elif args.command == 'add':
+                resolver = PackageResolver(project_root)
                 for package in args.packages:
-                    # Map package name before installation
-                    resolver = PackageResolver(project_root)
-                    mapped_name = resolver.PACKAGE_NAME_MAPPING.get(
-                        package, package
-                    )
+                    # Resolve package name using tlmgr
+                    resolved_name = resolver.resolve_package_name(package)
 
-                    # Skip core packages that map to None
-                    if mapped_name is None:
+                    # Skip core packages
+                    if resolved_name is None:
                         print(
                             f'Skipping {package} (core LaTeX package, no installation needed)'
                         )
                         continue
 
-                    env.install_package(mapped_name)
+                    env.install_package(resolved_name)
 
-                    # Add original package name to requirements file
+                    # Add resolved package name to requirements file
                     requirements = env.get_requirements()
-                    if mapped_name not in requirements:
+                    if resolved_name not in requirements:
                         with open(env.requirements_file, 'a') as f:
-                            f.write(f'{mapped_name}\n')
-                        print(f'Added {mapped_name} to latex-requirements.txt')
+                            f.write(f'{resolved_name}\n')
+                        print(
+                            f'Added {resolved_name} to latex-requirements.txt'
+                        )
+
+            elif args.command == 'remove':
+                resolver = PackageResolver(project_root)
+                for package in args.packages:
+                    # Resolve package name before removal
+                    resolved_name = resolver.resolve_package_name(package)
+
+                    # Skip core packages
+                    if resolved_name is None:
+                        print(
+                            f'Skipping {package} (core LaTeX package, cannot be removed)'
+                        )
+                        continue
+
+                    env.remove_package(resolved_name)
+
+            elif args.command == 'clean':
+                env.clean()
 
             elif args.command == 'compile':
                 env.compile(clean=args.clean)

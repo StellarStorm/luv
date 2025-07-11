@@ -147,10 +147,21 @@ luv compile --clean      # Clean build directory first
 
 ### `luv remove`
 
-Remove the local LaTeX environment (`.luv/` directory).
+Remove packages from requirements and uninstall them from the local environment.
 
 ```bash
-luv remove
+luv remove amsmath hyperref    # Remove multiple packages
+luv remove tikz               # Remove single package
+```
+
+Automatically removes packages from both the local environment and `latex-requirements.txt`.
+
+### `luv clean`
+
+Remove the entire local LaTeX environment (`.luv/` directory).
+
+```bash
+luv clean
 ```
 
 Preserves `luv.toml` and `latex-requirements.txt`.
