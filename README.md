@@ -37,14 +37,9 @@ Eventually I would like the tool to install TeX Live itself, much like
 ## Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/StellarStorm/luv.git
-cd luv
-
-# Install luv (development mode)
-uv tool install -e .
+uv tool install https://github.com/StellarStorm/luv.git
 # OR
-pip install -e .
+pip install git+https://github.com/StellarStorm/luv.git --break-system-packages --user
 ```
 
 ## Quick Start
