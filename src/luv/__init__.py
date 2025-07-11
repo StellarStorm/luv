@@ -855,11 +855,12 @@ class LaTeXEnvironment:
         # Detect if bibliography is needed
         has_bibliography = self._has_bibliography(texfile_path)
         has_citations = self._has_citations(texfile_path)
+        bibliography_backend = self._get_bibliography_backend(texfile_path)
 
         if has_bibliography and has_citations:
-            print('Bibliography detected, running full compilation sequence...')
+            print(f'Bibliography detected ({bibliography_backend}), running full compilation sequence...')
             success = self._compile_with_bibliography(
-                texfile, output_dir, engine, env
+                texfile, output_dir, engine, env, bibliography_backend
             )
         else:
             print('No bibliography detected, running single pass...')
@@ -894,6 +895,36 @@ class LaTeXEnvironment:
 
         except Exception:
             return False
+
+    def _get_bibliography_backend(self, texfile_path: Path) -> str:
+        """Determine which bibliography backend to use (biber or bibtex)."""
+        try:
+            with open(texfile_path, encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+
+            # Check for biblatex with backend specification
+            biblatex_pattern = r'\\usepackage\[([^\]]*)\]\{biblatex\}'
+            matches = re.findall(biblatex_pattern, content)
+
+            for match in matches:
+                if 'backend=biber' in match:
+                    return 'biber'
+                elif 'backend=bibtex' in match:
+                    return 'bibtex'
+
+            # Check if biblatex is used without explicit backend (defaults to biber)
+            if re.search(r'\\usepackage.*\{biblatex\}', content):
+                return 'biber'
+
+            # Check for traditional bibtex commands
+            if re.search(r'\\bibliographystyle\{', content):
+                return 'bibtex'
+
+            # Default fallback
+            return 'bibtex'
+
+        except Exception:
+            return 'bibtex'
 
     def _has_citations(self, texfile_path: Path) -> bool:
         """Check if the document has citations."""
@@ -957,7 +988,7 @@ class LaTeXEnvironment:
             )
 
     def _compile_with_bibliography(
-        self, texfile: str, output_dir: str, engine: str, env: dict
+        self, texfile: str, output_dir: str, engine: str, env: dict, backend: str = 'bibtex'
     ) -> bool:
         """Run full compilation sequence with bibliography."""
         basename = texfile.replace('.tex', '')
@@ -969,16 +1000,21 @@ class LaTeXEnvironment:
             return False
         print('  Pass 1 completed successfully')
 
-        # Run BibTeX if .aux file exists and has citations
+        # Run bibliography processor if .aux file exists and has citations
         aux_file = self.project_root / output_dir / f'{basename}.aux'
         if aux_file.exists():
-            print('  Pass 2: Processing bibliography...')
-            if not self._run_bibtex(basename, output_dir, env):
-                print('  Warning: BibTeX failed, continuing...')
+            print(f'  Pass 2: Processing bibliography ({backend})...')
+            if backend == 'biber':
+                success = self._run_biber(basename, output_dir, env)
+            else:
+                success = self._run_bibtex(basename, output_dir, env)
+
+            if not success:
+                print(f'  Warning: {backend} failed, continuing...')
             else:
                 print('  Pass 2 completed successfully')
         else:
-            print('  No .aux file found, skipping BibTeX')
+            print('  No .aux file found, skipping bibliography processing')
 
         # Second LaTeX pass (resolve bibliography)
         print('  Pass 3: Resolving references...')
@@ -1059,6 +1095,48 @@ class LaTeXEnvironment:
             raise LuvError(
                 f"LaTeX engine '{engine}' not found. Please install it first."
             )
+
+    def _run_biber(self, basename: str, output_dir: str, env: dict) -> bool:
+        """Run Biber on the auxiliary file."""
+        # Try different biber commands in order of preference
+        biber_commands = [
+            'biber',  # System biber
+            f'{self.texmf_dir}/scripts/biber/biber.pl',  # Local biber script
+            f'{self.texmf_dir}/bin/biber',  # Local biber binary
+        ]
+
+        for biber_cmd in biber_commands:
+            try:
+                cmd = [biber_cmd, f'{output_dir}/{basename}']
+                result = subprocess.run(
+                    cmd,
+                    cwd=self.project_root,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+
+                if result.returncode == 0:
+                    return True
+                else:
+                    print(f'Biber failed with return code {result.returncode}')
+                    print('Biber STDOUT:', result.stdout[-500:])
+                    print('Biber STDERR:', result.stderr[-500:])
+                    return False
+
+            except FileNotFoundError:
+                continue  # Try next biber command
+
+        # If no biber found, fall back to BibTeX
+        print('Biber not found in any location, falling back to BibTeX')
+        print('WARNING: Your document uses biblatex with biber backend, but biber is not installed.')
+        print('Please install biber on your system:')
+        print('  • macOS: brew install biber')
+        print('  • Ubuntu/Debian: sudo apt install biber')
+        print('  • Windows: Install from CTAN or use TeX Live Manager')
+        print('  • Or ensure biber is included in your TeX Live installation')
+        print('Falling back to BibTeX may not work correctly with biblatex.')
+        return self._run_bibtex(basename, output_dir, env)
 
     def _run_bibtex(self, basename: str, output_dir: str, env: dict) -> bool:
         """Run BibTeX on the auxiliary file."""
