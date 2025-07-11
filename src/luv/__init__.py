@@ -14,6 +14,7 @@ import subprocess
 import sys
 import tomllib
 from concurrent.futures import ThreadPoolExecutor
+from functools import lru_cache
 from pathlib import Path
 
 import tomli_w
@@ -126,6 +127,7 @@ class PackageResolver:
             for package, patterns in self.PACKAGE_PATTERNS.items()
         }
 
+    @lru_cache(maxsize=128)
     def resolve_package_name(self, latex_package: str) -> str | None:
         """Use tlmgr to find the correct TeX Live package name for a LaTeX package."""
         if latex_package in self.CORE_PACKAGES:
