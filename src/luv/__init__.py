@@ -107,6 +107,24 @@ class PackageResolver:
         self.found_packages = set()
         self.explicitly_used = set()
 
+        # Compile regex patterns once for better performance
+        self._usepackage_pattern = re.compile(
+            r'\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}'
+        )
+        self._include_patterns = [
+            re.compile(pattern)
+            for pattern in [
+                r'\\input\{([^}]+)\}',
+                r'\\include\{([^}]+)\}',
+                r'\\subfile\{([^}]+)\}',
+                r'\\InputIfFileExists\{([^}]+)\}',
+            ]
+        ]
+        self._compiled_package_patterns: dict[str, list[re.Pattern]] = {
+            package: [re.compile(pattern) for pattern in patterns]
+            for package, patterns in self.PACKAGE_PATTERNS.items()
+        }
+
     def resolve_package_name(self, latex_package: str) -> str | None:
         """Use tlmgr to find the correct TeX Live package name for a LaTeX package."""
         if latex_package in self.CORE_PACKAGES:
@@ -215,30 +233,22 @@ class PackageResolver:
             return
 
         # Find \\usepackage declarations
-        usepackage_pattern = r'\\usepackage(?:\[[^\]]*\])?\{([^}]+)\}'
-        matches = re.findall(usepackage_pattern, content)
+        matches = self._usepackage_pattern.findall(content)
 
         for match in matches:
             # Handle multiple packages in one declaration: {pkg1,pkg2,pkg3}
             packages = [pkg.strip() for pkg in match.split(',')]
             # Filter out packages that have local .sty files in the project
-            filtered_packages = []
-            for pkg in packages:
-                local_sty = self.project_root / f'{pkg}.sty'
-                if not local_sty.exists():
-                    filtered_packages.append(pkg)
+            filtered_packages = [
+                pkg
+                for pkg in packages
+                if not (self.project_root / f'{pkg}.sty').exists()
+            ]
             self.explicitly_used.update(filtered_packages)
 
         # Find included files
-        include_patterns = [
-            r'\\input\{([^}]+)\}',
-            r'\\include\{([^}]+)\}',
-            r'\\subfile\{([^}]+)\}',
-            r'\\InputIfFileExists\{([^}]+)\}',
-        ]
-
-        for pattern in include_patterns:
-            matches = re.findall(pattern, content)
+        for pattern in self._include_patterns:
+            matches = pattern.findall(content)
             for match in matches:
                 # Handle relative paths and add .tex extension if missing
                 included_file = match.strip()
@@ -273,30 +283,24 @@ class PackageResolver:
             return
 
         # Check each package pattern
-        for package, patterns in self.PACKAGE_PATTERNS.items():
+        for (
+            package,
+            compiled_patterns,
+        ) in self._compiled_package_patterns.items():
             if (
                 package not in self.explicitly_used
             ):  # Only suggest if not already declared
                 # Skip if local .sty file exists
-                local_sty = self.project_root / f'{package}.sty'
-                if local_sty.exists():
+                if (self.project_root / f'{package}.sty').exists():
                     continue
+                if any(
+                    pattern.search(content) for pattern in compiled_patterns
+                ):
+                    self.found_packages.add(package)
 
-                for pattern in patterns:
-                    if re.search(pattern, content):
-                        self.found_packages.add(package)
-                        break  # Found one pattern for this package, no need to check others
-
-        # Find included files (same logic as above)
-        include_patterns = [
-            r'\\input\{([^}]+)\}',
-            r'\\include\{([^}]+)\}',
-            r'\\subfile\{([^}]+)\}',
-            r'\\InputIfFileExists\{([^}]+)\}',
-        ]
-
-        for pattern in include_patterns:
-            matches = re.findall(pattern, content)
+        # Find included files
+        for pattern in self._include_patterns:
+            matches = pattern.findall(content)
             for match in matches:
                 included_file = match.strip()
                 if not included_file.endswith('.tex'):
