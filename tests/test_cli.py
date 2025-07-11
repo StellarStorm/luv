@@ -50,7 +50,9 @@ class TestMainCLI:
 
     def test_main_init_with_custom_texfile(self, mocker, temp_project):
         """Test init command with custom texfile."""
-        mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'init', '--texfile', 'document.tex'])
+        mock_argv = mocker.patch.object(
+            sys, 'argv', ['luv', 'init', '--texfile', 'document.tex']
+        )
         mock_cwd = mocker.patch('pathlib.Path.cwd', return_value=temp_project)
         mock_print = mocker.patch('builtins.print')
 
@@ -63,7 +65,9 @@ class TestMainCLI:
 
     def test_main_init_with_custom_engine(self, mocker, temp_project):
         """Test init command with custom engine."""
-        mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'init', '--engine', 'xelatex'])
+        mock_argv = mocker.patch.object(
+            sys, 'argv', ['luv', 'init', '--engine', 'xelatex']
+        )
         mock_cwd = mocker.patch('pathlib.Path.cwd', return_value=temp_project)
         mock_print = mocker.patch('builtins.print')
 
@@ -77,7 +81,9 @@ class TestMainCLI:
     def test_main_command_without_project_root(self, mocker):
         """Test commands that require project root but none exists."""
         mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'sync'])
-        mock_find_root = mocker.patch('luv.find_project_root', return_value=None)
+        mock_find_root = mocker.patch(
+            'luv.find_project_root', return_value=None
+        )
 
         with pytest.raises(SystemExit) as exc_info:
             main()
@@ -96,7 +102,9 @@ class TestMainCLI:
 
         mocker.patch.object(sys, 'argv', ['luv', 'resolve', '--dry-run'])
         mocker.patch('luv.find_project_root', return_value=temp_project)
-        mock_resolve = mocker.patch.object(env.__class__, 'resolve_dependencies')
+        mock_resolve = mocker.patch.object(
+            env.__class__, 'resolve_dependencies'
+        )
 
         # Mock the LaTeXEnvironment class to return our prepared instance
         mock_env_class = mocker.patch('luv.LaTeXEnvironment')
@@ -105,7 +113,9 @@ class TestMainCLI:
         main()
 
         # Verify resolve_dependencies was called with correct parameters
-        mock_resolve.assert_called_once_with(update_requirements=False, interactive=False)
+        mock_resolve.assert_called_once_with(
+            update_requirements=False, interactive=False
+        )
 
     def test_main_sync_command(self, mocker, temp_project):
         """Test the sync command."""
@@ -152,8 +162,12 @@ class TestMainCLI:
         env = LaTeXEnvironment(temp_project)
         env.create()
 
-        mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'remove', 'amsmath'])
-        mock_find_root = mocker.patch('luv.find_project_root', return_value=temp_project)
+        mock_argv = mocker.patch.object(
+            sys, 'argv', ['luv', 'remove', 'amsmath']
+        )
+        mock_find_root = mocker.patch(
+            'luv.find_project_root', return_value=temp_project
+        )
         mock_remove = mocker.patch.object(env.__class__, 'remove_package')
         mock_resolver_init = mocker.patch('luv.PackageResolver')
         mock_resolver = mocker.Mock()
@@ -172,7 +186,9 @@ class TestMainCLI:
         env.create()
 
         mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'clean'])
-        mock_find_root = mocker.patch('luv.find_project_root', return_value=temp_project)
+        mock_find_root = mocker.patch(
+            'luv.find_project_root', return_value=temp_project
+        )
         mock_clean = mocker.patch.object(env.__class__, 'clean')
 
         mock_env_class = mocker.patch('luv.LaTeXEnvironment')
@@ -187,7 +203,9 @@ class TestMainCLI:
         env.create()
 
         mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'compile'])
-        mock_find_root = mocker.patch('luv.find_project_root', return_value=temp_project)
+        mock_find_root = mocker.patch(
+            'luv.find_project_root', return_value=temp_project
+        )
         mock_compile = mocker.patch.object(env.__class__, 'compile')
 
         mock_env_class = mocker.patch('luv.LaTeXEnvironment')
@@ -201,8 +219,12 @@ class TestMainCLI:
         env = LaTeXEnvironment(temp_project)
         env.create()
 
-        mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'compile', '--clean'])
-        mock_find_root = mocker.patch('luv.find_project_root', return_value=temp_project)
+        mock_argv = mocker.patch.object(
+            sys, 'argv', ['luv', 'compile', '--clean']
+        )
+        mock_find_root = mocker.patch(
+            'luv.find_project_root', return_value=temp_project
+        )
         mock_compile = mocker.patch.object(env.__class__, 'compile')
 
         mock_env_class = mocker.patch('luv.LaTeXEnvironment')
@@ -217,11 +239,23 @@ class TestMainCLI:
         env.create()
 
         mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'info'])
-        mock_find_root = mocker.patch('luv.find_project_root', return_value=temp_project)
-        mock_get_config = mocker.patch.object(env.__class__, 'get_config', return_value={
-            'project': {'texfile': 'main.tex', 'engine': 'pdflatex', 'output_dir': 'build'}
-        })
-        mock_get_req = mocker.patch.object(env.__class__, 'get_requirements', return_value=['amsmath'])
+        mock_find_root = mocker.patch(
+            'luv.find_project_root', return_value=temp_project
+        )
+        mock_get_config = mocker.patch.object(
+            env.__class__,
+            'get_config',
+            return_value={
+                'project': {
+                    'texfile': 'main.tex',
+                    'engine': 'pdflatex',
+                    'output_dir': 'build',
+                }
+            },
+        )
+        mock_get_req = mocker.patch.object(
+            env.__class__, 'get_requirements', return_value=['amsmath']
+        )
         mock_print = mocker.patch('builtins.print')
 
         mock_env_class = mocker.patch('luv.LaTeXEnvironment')
@@ -231,7 +265,9 @@ class TestMainCLI:
         # Verify info was printed
         mock_print.assert_called()
         # Check that project info was displayed
-        print_calls = [call[0][0] for call in mock_print.call_args_list if call[0]]
+        print_calls = [
+            call[0][0] for call in mock_print.call_args_list if call[0]
+        ]
         info_text = ' '.join(print_calls)
         assert 'main.tex' in info_text
         assert 'amsmath' in info_text
@@ -313,7 +349,9 @@ class TestArgumentParsing:
 
     def test_resolve_help(self, mocker, capsys):
         """Test resolve command help."""
-        mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'resolve', '--help'])
+        mock_argv = mocker.patch.object(
+            sys, 'argv', ['luv', 'resolve', '--help']
+        )
 
         with pytest.raises(SystemExit):
             main()
@@ -324,7 +362,9 @@ class TestArgumentParsing:
 
     def test_compile_help(self, mocker, capsys):
         """Test compile command help."""
-        mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'compile', '--help'])
+        mock_argv = mocker.patch.object(
+            sys, 'argv', ['luv', 'compile', '--help']
+        )
 
         with pytest.raises(SystemExit):
             main()

@@ -22,7 +22,8 @@ class TestCompilation:
 
             # Create main.tex
             main_tex = project_root / 'main.tex'
-            main_tex.write_text("""
+            main_tex.write_text(
+                """
 \\documentclass{article}
 \\usepackage{amsmath}
 
@@ -35,11 +36,13 @@ class TestCompilation:
 \\end{align}
 
 \\end{document}
-""")
+"""
+            )
 
             # Create a bib file for bibliography tests
             bib_file = project_root / 'refs.bib'
-            bib_file.write_text("""
+            bib_file.write_text(
+                """
 @article{einstein1905,
     title={Zur Elektrodynamik bewegter K{\"o}rper},
     author={Einstein, Albert},
@@ -49,7 +52,8 @@ class TestCompilation:
     pages={891--921},
     year={1905}
 }
-""")
+"""
+            )
 
             yield project_root
 
@@ -142,7 +146,9 @@ class TestCompilation:
     def test_check_warnings(self, env, capsys):
         """Test warning detection in LaTeX output."""
         # Test undefined references warning
-        stdout_with_undef_refs = "LaTeX Warning: There were undefined references."
+        stdout_with_undef_refs = (
+            "LaTeX Warning: There were undefined references."
+        )
         env._check_warnings(stdout_with_undef_refs)
         captured = capsys.readouterr()
         assert "Undefined references detected" in captured.out
@@ -182,7 +188,9 @@ class TestCompilation:
     def test_compile_single_pass_failure(self, env, mocker):
         """Test single pass compilation failure."""
         mock_run = mocker.patch('subprocess.run')
-        mock_run.return_value = mocker.Mock(returncode=1, stdout="Error!", stderr="Fatal error")
+        mock_run.return_value = mocker.Mock(
+            returncode=1, stdout="Error!", stderr="Fatal error"
+        )
 
         result = env._compile_single_pass('main.tex', 'build', 'pdflatex', {})
         assert result is False
@@ -357,7 +365,9 @@ class TestPackageInstallation:
         """Test installing package not in repository."""
         mocker.patch.object(env, '_setup_tlmgr_user_mode')
         mock_run = mocker.patch('subprocess.run')
-        mock_run.return_value = mocker.Mock(returncode=1, stdout="", stderr="not present in repository")
+        mock_run.return_value = mocker.Mock(
+            returncode=1, stdout="", stderr="not present in repository"
+        )
 
         result = env._try_install_package('nonexistent')
         assert result is False

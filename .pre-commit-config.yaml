@@ -53,10 +53,10 @@ repos:
       # Update the uv lockfile
       - id: uv-lock
       - id: pip-compile
-        args: [pyproject.toml, -o, requirements.txt]
+        args: [pyproject.toml, -o, requirements.txt, -q]
         files: pyproject.toml
       - id: uv-export
-        args: [-o, pylock.toml]
+        args: [-o, pylock.toml, -q]
 
   -   repo: https://github.com/asottile/dead
       rev: v2.1.0

@@ -44,25 +44,14 @@ class TestSimpleTOMLWriter:
         assert 'packages = ["amsmath", "graphicx"]' in result
 
     def test_dumps_section(self):
-        data = {
-            'project': {
-                'texfile': 'main.tex',
-                'engine': 'pdflatex'
-            }
-        }
+        data = {'project': {'texfile': 'main.tex', 'engine': 'pdflatex'}}
         result = SimpleTOMLWriter.dumps(data)
         assert '[project]' in result
         assert 'texfile = "main.tex"' in result
         assert 'engine = "pdflatex"' in result
 
     def test_dumps_mixed_data(self):
-        data = {
-            'debug': True,
-            'project': {
-                'texfile': 'main.tex',
-                'port': 8080
-            }
-        }
+        data = {'debug': True, 'project': {'texfile': 'main.tex', 'port': 8080}}
         result = SimpleTOMLWriter.dumps(data)
         assert 'debug = true' in result
         assert '[project]' in result
@@ -81,7 +70,8 @@ class TestPackageResolver:
 
             # Create main.tex with sample content
             main_tex = project_root / 'main.tex'
-            main_tex.write_text("""
+            main_tex.write_text(
+                """
 \\documentclass{article}
 \\usepackage{amsmath}
 \\usepackage[utf8]{inputenc}
@@ -96,16 +86,19 @@ class TestPackageResolver:
 \\href{http://example.com}{Link}
 \\input{chapter1}
 \\end{document}
-""")
+"""
+            )
 
             # Create included file
             chapter1 = project_root / 'chapter1.tex'
-            chapter1.write_text("""
+            chapter1.write_text(
+                """
 \\usepackage{tikz}
 \\begin{tikzpicture}
 \\node at (0,0) {Hello};
 \\end{tikzpicture}
-""")
+"""
+            )
 
             yield project_root
 
@@ -122,7 +115,10 @@ class TestPackageResolver:
     def test_package_patterns_defined(self):
         assert 'amsmath' in PackageResolver.PACKAGE_PATTERNS
         assert 'graphicx' in PackageResolver.PACKAGE_PATTERNS
-        assert any('\\\\begin\\{align' in pattern for pattern in PackageResolver.PACKAGE_PATTERNS['amsmath'])
+        assert any(
+            '\\\\begin\\{align' in pattern
+            for pattern in PackageResolver.PACKAGE_PATTERNS['amsmath']
+        )
 
     def test_resolve_package_name_core_package(self, temp_project):
         resolver = PackageResolver(temp_project)
@@ -136,7 +132,7 @@ class TestPackageResolver:
         mock_run = mocker.patch('subprocess.run')
         mock_run.return_value = mocker.Mock(
             returncode=0,
-            stdout='texlive-latex-base:\n    /usr/share/texlive/texmf-dist/tex/latex/base/amsmath.sty\n'
+            stdout='texlive-latex-base:\n    /usr/share/texlive/texmf-dist/tex/latex/base/amsmath.sty\n',
         )
 
         result = resolver.resolve_package_name('amsmath')
@@ -160,7 +156,9 @@ class TestPackageResolver:
         mock_run.side_effect = FileNotFoundError()
 
         result = resolver.resolve_package_name('amsmath')
-        assert result == 'amsmath'  # Returns original name if tlmgr not available
+        assert (
+            result == 'amsmath'
+        )  # Returns original name if tlmgr not available
 
     def test_find_explicit_packages(self, temp_project):
         resolver = PackageResolver(temp_project)
@@ -190,7 +188,7 @@ class TestPackageResolver:
         mock_run = mocker.patch('subprocess.run')
         mock_run.return_value = mocker.Mock(
             returncode=0,
-            stdout='texlive-latex-base:\n    /path/to/package.sty\n'
+            stdout='texlive-latex-base:\n    /path/to/package.sty\n',
         )
 
         packages = resolver.resolve_dependencies('main.tex')
@@ -235,7 +233,10 @@ class TestLaTeXEnvironment:
         assert env.project_root == temp_project
         assert env.luv_dir == temp_project / '.luv'
         assert env.texmf_dir == temp_project / '.luv' / 'texmf'
-        assert env.packages_dir == temp_project / '.luv' / 'texmf' / 'tex' / 'latex'
+        assert (
+            env.packages_dir
+            == temp_project / '.luv' / 'texmf' / 'tex' / 'latex'
+        )
         assert env.config_file == temp_project / 'luv.toml'
         assert env.requirements_file == temp_project / 'latex-requirements.txt'
 
@@ -309,10 +310,7 @@ class TestLaTeXEnvironment:
         env._create_initial_config()
 
         new_config = {
-            'project': {
-                'texfile': 'document.tex',
-                'engine': 'xelatex'
-            }
+            'project': {'texfile': 'document.tex', 'engine': 'xelatex'}
         }
         env.update_config(new_config)
 
@@ -325,13 +323,15 @@ class TestLaTeXEnvironment:
         assert requirements == []
 
     def test_get_requirements_with_packages(self, env):
-        env.requirements_file.write_text("""
+        env.requirements_file.write_text(
+            """
 # Comments should be ignored
 amsmath
 graphicx
 # Another comment
 hyperref
-""")
+"""
+        )
 
         requirements = env.get_requirements()
         assert requirements == ['amsmath', 'graphicx', 'hyperref']
@@ -426,7 +426,9 @@ hyperref
         mock_instance.resolve_package_name.return_value = 'amsmath'
         mock_resolver.return_value = mock_instance
 
-        packages = env.resolve_dependencies(update_requirements=False, interactive=False)
+        packages = env.resolve_dependencies(
+            update_requirements=False, interactive=False
+        )
         assert packages == ['amsmath']
 
     def test_sync_no_requirements(self, env):
@@ -527,7 +529,8 @@ class TestIntegration:
 
             # Create main.tex
             main_tex = project_root / 'main.tex'
-            main_tex.write_text("""
+            main_tex.write_text(
+                """
 \\documentclass{article}
 \\usepackage{amsmath}
 \\usepackage{graphicx}
@@ -539,7 +542,8 @@ class TestIntegration:
 
 \\includegraphics{example.png}
 \\end{document}
-""")
+"""
+            )
 
             yield project_root
 
@@ -557,11 +561,13 @@ class TestIntegration:
         mock_run = mocker.patch('subprocess.run')
         mock_run.return_value = mocker.Mock(
             returncode=0,
-            stdout='texlive-latex-base:\n    /path/to/package.sty\n'
+            stdout='texlive-latex-base:\n    /path/to/package.sty\n',
         )
 
         # Resolve dependencies
-        packages = env.resolve_dependencies(update_requirements=False, interactive=False)
+        packages = env.resolve_dependencies(
+            update_requirements=False, interactive=False
+        )
         assert isinstance(packages, list)
         assert len(packages) > 0
 
@@ -581,7 +587,8 @@ class TestIntegration:
         """Test PackageResolver with real LaTeX files."""
         # Create a comprehensive LaTeX file
         main_tex = temp_project / 'main.tex'
-        main_tex.write_text("""
+        main_tex.write_text(
+            """
 \\documentclass{article}
 \\usepackage{amsmath,amssymb}
 \\usepackage[utf8]{inputenc}
@@ -608,7 +615,8 @@ Some text with \\textcolor{red}{colored text}.
 \\href{https://example.com}{A link}
 
 \\end{document}
-""")
+"""
+        )
 
         resolver = PackageResolver(temp_project)
 

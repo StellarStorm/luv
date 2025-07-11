@@ -859,7 +859,9 @@ class LaTeXEnvironment:
         bibliography_backend = self._get_bibliography_backend(texfile_path)
 
         if has_bibliography and has_citations:
-            print(f'Bibliography detected ({bibliography_backend}), running full compilation sequence...')
+            print(
+                f'Bibliography detected ({bibliography_backend}), running full compilation sequence...'
+            )
             success = self._compile_with_bibliography(
                 texfile, output_dir, engine, env, bibliography_backend
             )
@@ -989,7 +991,12 @@ class LaTeXEnvironment:
             )
 
     def _compile_with_bibliography(
-        self, texfile: str, output_dir: str, engine: str, env: dict, backend: str = 'bibtex'
+        self,
+        texfile: str,
+        output_dir: str,
+        engine: str,
+        env: dict,
+        backend: str = 'bibtex',
     ) -> bool:
         """Run full compilation sequence with bibliography."""
         basename = texfile.replace('.tex', '')
@@ -1130,7 +1137,9 @@ class LaTeXEnvironment:
 
         # If no biber found, fall back to BibTeX
         print('Biber not found in any location, falling back to BibTeX')
-        print('WARNING: Your document uses biblatex with biber backend, but biber is not installed.')
+        print(
+            'WARNING: Your document uses biblatex with biber backend, but biber is not installed.'
+        )
         print('Please install biber on your system:')
         print('  • macOS: brew install biber')
         print('  • Ubuntu/Debian: sudo apt install biber')
