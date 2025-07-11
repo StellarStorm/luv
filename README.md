@@ -18,7 +18,7 @@
 ## Prerequisites
 
 - TeX Live distribution (TinyTeX recommended)
-- Python 3.11 (for running luv)
+- Python 3.11 or later (for running luv)
 
 Install TinyTeX:
 
@@ -38,7 +38,7 @@ Eventually I would like the tool to install TeX Live itself, much like
 
 ```bash
 # Clone the repository
-git clone https://github.com/stellarstorm/luv.git
+git clone https://github.com/StellarStorm/luv.git
 cd luv
 
 # Install luv (development mode)
