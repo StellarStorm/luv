@@ -623,7 +623,8 @@ class LaTeXEnvironment:
 
         # If direct installation failed, try to resolve the package dynamically
         print(f'Package {package_name} not found, searching for it...')
-        resolved_package = self.resolve_package_name(package_name)
+        resolver = PackageResolver(self.project_root)
+        resolved_package = resolver.resolve_package_name(package_name)
 
         if resolved_package and resolved_package != package_name:
             print(f'Found {package_name} in package: {resolved_package}')
