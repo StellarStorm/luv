@@ -195,7 +195,7 @@ class PackageResolver:
 
         print(f'Resolving {len(all_packages)} packages using tlmgr...')
 
-        mw = min(8, len(all_packages))
+        mw = min(8, max(1, len(all_packages)))
         with ThreadPoolExecutor(max_workers=mw) as executor:
             package_futures = {
                 executor.submit(self.resolve_package_name, package): package
@@ -778,7 +778,7 @@ class LaTeXEnvironment:
         ]
 
         failed_packages = []
-        mw = min(4, len(package_names))
+        mw = min(4, max(1, len(package_names)))
         with ThreadPoolExecutor(max_workers=mw) as executor:
             package_futures = {
                 executor.submit(
