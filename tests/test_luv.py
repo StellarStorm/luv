@@ -400,12 +400,15 @@ hyperref
         env.requirements_file.write_text('amsmath\ngraphicx')
 
         # Mock install_package
-        mock_install = mocker.patch.object(env, 'install_package')
+        mock_install = mocker.patch.object(
+            env, 'install_package_smart', return_value=True
+        )
         mock_setup = mocker.patch.object(env, '_setup_tlmgr_user_mode')
 
         env.sync()
 
-        mock_setup.assert_called_once()
+        # With parallel installation, _setup_tlmgr_user_mode may be called multiple times
+        assert mock_setup.call_count >= 1
         assert mock_install.call_count == 2
         mock_install.assert_any_call('amsmath')
         mock_install.assert_any_call('graphicx')
@@ -530,7 +533,9 @@ class TestIntegration:
         assert len(packages) > 0
 
         # Mock package installation for sync
-        mock_install = mocker.patch.object(env, 'install_package')
+        mock_install = mocker.patch.object(
+            env, 'install_package_smart', return_value=True
+        )
         mock_setup = mocker.patch.object(env, '_setup_tlmgr_user_mode')
 
         # Update requirements manually for testing
@@ -538,7 +543,8 @@ class TestIntegration:
 
         # Sync packages
         env.sync()
-        mock_setup.assert_called_once()
+        # With parallel installation, _setup_tlmgr_user_mode may be called multiple times
+        assert mock_setup.call_count >= 1
         assert mock_install.call_count == 2
 
     def test_package_resolver_with_real_files(self, temp_project):

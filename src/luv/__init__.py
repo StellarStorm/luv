@@ -13,6 +13,7 @@ import shutil
 import subprocess
 import sys
 import tomllib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import tomli_w
@@ -192,12 +193,23 @@ class PackageResolver:
 
         print(f'Resolving {len(all_packages)} packages using tlmgr...')
 
-        for package in all_packages:
-            tex_live_name = self.resolve_package_name(package)
-            if tex_live_name is not None:
-                resolved_packages.add(tex_live_name)
-                if tex_live_name != package:
-                    print(f'  {package} → {tex_live_name}')
+        mw = min(8, len(all_packages))
+        with ThreadPoolExecutor(max_workers=mw) as executor:
+            package_futures = {
+                executor.submit(self.resolve_package_name, package): package
+                for package in all_packages
+            }
+
+            for future in package_futures:
+                package = package_futures[future]
+                try:
+                    tex_live_name = future.result()
+                    if tex_live_name is not None:
+                        resolved_packages.add(tex_live_name)
+                        if tex_live_name != package:
+                            print(f'  {package} → {tex_live_name}')
+                except Exception as e:
+                    print(f'  Warning: Failed to resolve {package}: {e}')
 
         # Add automatic dependencies based on detected packages
         all_packages = self.found_packages | self.explicitly_used
@@ -618,7 +630,6 @@ class LaTeXEnvironment:
             )
 
             if result.returncode == 0:
-                print(f'Successfully installed {package_name}')
                 return True
             elif (
                 'already installed' in result.stdout
@@ -758,17 +769,31 @@ class LaTeXEnvironment:
         # Ensure tlmgr user mode is set up first
         self._setup_tlmgr_user_mode()
 
+        # Extract package names (handle version specifications)
+        package_names = [
+            package.split('==')[0].split('>=')[0].split('<=')[0].strip()
+            for package in requirements
+        ]
+
         failed_packages = []
-        for package in requirements:
-            # Handle version specifications (package==version or package>=version)
-            package_name = (
-                package.split('==')[0].split('>=')[0].split('<=')[0].strip()
-            )
-            try:
-                self.install_package(package_name)
-            except Exception as e:
-                print(f'Failed to install {package_name}: {e}')
-                failed_packages.append(package_name)
+        mw = min(4, len(package_names))
+        with ThreadPoolExecutor(max_workers=mw) as executor:
+            package_futures = {
+                executor.submit(
+                    self.install_package_smart, package_name
+                ): package_name
+                for package_name in package_names
+            }
+
+            for future in package_futures:
+                package_name = package_futures[future]
+                try:
+                    success = future.result()
+                    if not success:
+                        failed_packages.append(package_name)
+                except Exception as e:
+                    print(f'Failed to install {package_name}: {e}')
+                    failed_packages.append(package_name)
 
         if failed_packages:
             print(
