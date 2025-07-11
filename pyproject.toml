@@ -1,0 +1,36 @@
+[project]
+name = "luv"
+version = "0.1.0"
+description = "LaTeX Universal Virtualizer"
+readme = "README.md"
+authors = [
+    { name = "Skylar Gay", email = "sscodes77@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+luv = "luv:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.2.0",
+]
+
+[tool.ruff]
+line-length = 80
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.black]
+line-length = 80
+skip-string-normalization = true
+
+[tool.isort]
+profile = "black"
+line_length = 80

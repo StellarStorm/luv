@@ -1,0 +1,64 @@
+default_stages: [pre-commit]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: check-added-large-files
+        exclude: '(^.*\.ipynb$|^uv\.lock$|^pylock\.toml$)'
+      - id: check-ast
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-toml
+      - id: check-json
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: mixed-line-ending
+      - id: debug-statements
+
+  - repo: https://github.com/pycqa/isort
+    rev: "6.0.1"
+    hooks:
+      - id: isort
+        args: ["--profile", "black", "--line-length=80"]
+
+  - repo: https://github.com/psf/black
+    rev: 25.1.0
+    hooks:
+      - id: black
+        args: ["--line-length=80"]
+
+  - repo: https://github.com/hadialqattan/pycln
+    rev: "v2.5.0"
+    hooks:
+      - id: pycln
+        args: ["--all"]
+
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: ["--exclude-files", ".*\\.ipynb", "--exclude-files", "pyproject.toml", "--exclude-files", "pylock.toml"]
+
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.20.0
+    hooks:
+      - id: pyupgrade
+        args: [--py311-plus]
+
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.7.20
+    hooks:
+      # Update the uv lockfile
+      - id: uv-lock
+      - id: pip-compile
+        args: [pyproject.toml, -o, requirements.txt]
+        files: pyproject.toml
+      - id: uv-export
+        args: [-o, pylock.toml]
+
+  -   repo: https://github.com/asottile/dead
+      rev: v2.1.0
+      hooks:
+      -   id: dead
