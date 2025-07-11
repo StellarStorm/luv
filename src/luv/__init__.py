@@ -24,17 +24,19 @@ class PackageResolver:
     """Resolves LaTeX package dependencies from source files using tlmgr search."""
 
     # Only core packages that should be skipped (already part of LaTeX base)
-    CORE_PACKAGES = {
-        'fontenc',
-        'inputenc',
-        'textcomp',
-        'ifthen',
-        'calc',
-        'url',
-    }
+    CORE_PACKAGES: frozenset[str] = frozenset(
+        {
+            'fontenc',
+            'inputenc',
+            'textcomp',
+            'ifthen',
+            'calc',
+            'url',
+        }
+    )
 
     # Common LaTeX packages and their typical command/environment indicators
-    PACKAGE_PATTERNS = {
+    PACKAGE_PATTERNS: dict[str, list[str]] = {
         # Math packages
         'amsmath': [
             r'\\begin\{align',
@@ -106,8 +108,8 @@ class PackageResolver:
 
     def __init__(self, project_root: Path):
         self.project_root = project_root
-        self.found_packages = set()
-        self.explicitly_used = set()
+        self.found_packages: set[str] = set()
+        self.explicitly_used: set[str] = set()
 
         # Compile regex patterns once for better performance
         self._usepackage_pattern = re.compile(
