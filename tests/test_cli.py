@@ -233,15 +233,13 @@ class TestMainCLI:
 
         mock_compile.assert_called_once_with(clean=True)
 
-    def test_main_info_command(self, mocker, temp_project):
+    def test_main_info_command(self, mocker, temp_project, capsys):
         """Test the info command."""
         env = LaTeXEnvironment(temp_project)
         env.create()
 
-        mock_argv = mocker.patch.object(sys, 'argv', ['luv', 'info'])
-        mock_find_root = mocker.patch(
-            'luv.find_project_root', return_value=temp_project
-        )
+        mocker.patch.object(sys, 'argv', ['luv', 'info'])
+        mocker.patch('luv.find_project_root', return_value=temp_project)
         mock_get_config = mocker.patch.object(
             env.__class__,
             'get_config',
@@ -256,21 +254,16 @@ class TestMainCLI:
         mock_get_req = mocker.patch.object(
             env.__class__, 'get_requirements', return_value=['amsmath']
         )
-        mock_print = mocker.patch('builtins.print')
 
         mock_env_class = mocker.patch('luv.LaTeXEnvironment')
         mock_env_class.return_value = env
+
         main()
 
-        # Verify info was printed
-        mock_print.assert_called()
-        # Check that project info was displayed
-        print_calls = [
-            call[0][0] for call in mock_print.call_args_list if call[0]
-        ]
-        info_text = ' '.join(print_calls)
-        assert 'main.tex' in info_text
-        assert 'amsmath' in info_text
+        # Verify info was logged to stdout
+        captured = capsys.readouterr()
+        assert 'main.tex' in captured.out
+        assert 'amsmath' in captured.out
 
     def test_main_luv_error_handling(self, mocker, temp_project):
         """Test that LuvError exceptions are handled properly."""
@@ -287,11 +280,12 @@ class TestMainCLI:
 
         assert exc_info.value.code == 1
 
-    def test_main_keyboard_interrupt_handling(self, mocker, temp_project):
+    def test_main_keyboard_interrupt_handling(
+        self, mocker, temp_project, capsys
+    ):
         """Test that KeyboardInterrupt is handled properly."""
         mocker.patch.object(sys, 'argv', ['luv', 'sync'])
         mocker.patch('luv.find_project_root', return_value=temp_project)
-        mock_print = mocker.patch('builtins.print')
 
         mock_env_class = mocker.patch('luv.LaTeXEnvironment')
         mock_env = mocker.Mock()
@@ -302,7 +296,9 @@ class TestMainCLI:
             main()
 
         assert exc_info.value.code == 1
-        mock_print.assert_called_with('\nOperation cancelled.')
+        # Check that cancellation message was logged to stdout
+        captured = capsys.readouterr()
+        assert 'Operation cancelled' in captured.out
 
     def test_main_unexpected_error_handling(self, mocker, temp_project):
         """Test that unexpected exceptions are handled properly."""

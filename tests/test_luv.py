@@ -241,16 +241,19 @@ class TestLaTeXEnvironment:
         assert '# LaTeX package requirements' in content
         assert '# amsmath' in content
 
-    def test_remove_environment(self, env):
+    def test_clean_environment(self, env):
         env.create()
         assert env.exists()
 
-        env.remove()
+        env.clean()
         assert not env.exists()
 
-    def test_remove_nonexistent_environment(self, env):
-        with pytest.raises(LuvError, match='No environment found to remove'):
-            env.remove()
+    def test_clean_nonexistent_environment(self, env, capsys):
+        env.clean()
+
+        # Check that warning was logged to stdout
+        captured = capsys.readouterr()
+        assert 'No environment found to clean' in captured.out
 
     def test_get_config(self, env):
         env._create_initial_config()
@@ -301,9 +304,12 @@ hyperref
         env.clean()
         assert not env.exists()
 
-    def test_clean_nonexistent(self, env):
-        with pytest.raises(LuvError, match='No environment found to clean'):
-            env.clean()
+    def test_clean_nonexistent(self, env, capsys):
+        env.clean()
+
+        # Check that warning was logged to stdout
+        captured = capsys.readouterr()
+        assert 'No environment found to clean' in captured.out
 
     def test_has_bibliography_with_bibliography(self, env):
         tex_file = env.project_root / 'main.tex'

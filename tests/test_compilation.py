@@ -64,12 +64,15 @@ class TestCompilation:
         env.create()
         return env
 
-    def test_compile_no_environment(self, temp_project):
-        """Test compilation fails when no environment exists."""
+    def test_compile_no_environment(self, temp_project, capsys):
+        """Test compilation logs error when no environment exists."""
         env = LaTeXEnvironment(temp_project)
 
-        with pytest.raises(LuvError, match="No environment found"):
-            env.compile()
+        env.compile()
+
+        # Check that error was logged to stdout
+        captured = capsys.readouterr()
+        assert 'No environment found' in captured.out
 
     def test_compile_no_texfile(self, env):
         """Test compilation fails when TeX file doesn't exist."""
@@ -302,13 +305,16 @@ class TestPackageInstallation:
             env.create()
             yield env
 
-    def test_install_package_no_environment(self):
-        """Test package installation fails without environment."""
+    def test_install_package_no_environment(self, capsys):
+        """Test package installation logs error without environment."""
         with tempfile.TemporaryDirectory() as temp_dir:
             env = LaTeXEnvironment(Path(temp_dir))
 
-            with pytest.raises(LuvError, match='No environment found'):
-                env.install_package('amsmath')
+            env.install_package('amsmath')
+
+            # Check that error was logged to stdout
+            captured = capsys.readouterr()
+            assert 'No environment found' in captured.out
 
     def test_setup_tlmgr_user_mode(self, env, mocker):
         """Test tlmgr user mode setup."""
@@ -438,10 +444,13 @@ class TestPackageInstallation:
         # Should not raise error
         env.remove_package('nonexistent')
 
-    def test_remove_package_no_environment(self):
-        """Test package removal without environment."""
+    def test_remove_package_no_environment(self, capsys):
+        """Test package removal logs error without environment."""
         with tempfile.TemporaryDirectory() as temp_dir:
             env = LaTeXEnvironment(Path(temp_dir))
 
-            with pytest.raises(LuvError, match="No environment found"):
-                env.remove_package('amsmath')
+            env.remove_package('amsmath')
+
+            # Check that error was logged to stdout
+            captured = capsys.readouterr()
+            assert 'No environment found' in captured.out
