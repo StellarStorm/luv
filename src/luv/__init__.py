@@ -978,36 +978,13 @@ class LaTeXEnvironment:
         self, texfile: str, output_dir: str, engine: str, env: dict
     ) -> bool:
         """Run a single LaTeX compilation pass."""
-        cmd = [
-            engine,
-            '-interaction=nonstopmode',
-            f'-output-directory={output_dir}',
-            str(texfile),
-        ]
+        success = self._run_latex_pass(
+            texfile, output_dir, engine, env, final=True
+        )
+        if success:
+            logger.info(f'Compilation successful! Output in {output_dir}/')
 
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=self.project_root,
-                env=env,
-                capture_output=True,
-                text=True,
-            )
-
-            if result.returncode != 0:
-                logger.error('Compilation failed!')
-                logger.error(f'STDOUT: {result.stdout}')
-                logger.error(f'STDERR: {result.stderr}')
-                return False
-            else:
-                self._check_warnings(result.stdout)
-                logger.info(f'Compilation successful! Output in {output_dir}/')
-                return True
-
-        except FileNotFoundError:
-            raise LuvError(
-                f"LaTeX engine '{engine}' not found. Please install it first."
-            )
+        return success
 
     def _compile_with_bibliography(
         self,
@@ -1091,7 +1068,14 @@ class LaTeXEnvironment:
                 text=True,
             )
 
-            # Check if PDF was actually generated (more reliable than return code)
+            if result.returncode != 0:
+                logger.error('Compilation failed!')
+                logger.error(f'STDOUT: {result.stdout}')
+                logger.error(f'STDERR: {result.stderr}')
+                return False
+
+            # Check if PDF was actually generated
+            # (may be more reliable than return code)
             basename = texfile.replace('.tex', '')
             pdf_file = self.project_root / output_dir / f'{basename}.pdf'
 
