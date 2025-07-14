@@ -37,6 +37,20 @@ name = "luv"
 directory = { path = ".", editable = true }
 
 [[packages]]
+name = "markdown-it-py"
+version = "3.0.0"
+index = "https://pypi.org/simple"
+sdist = { url = "https://files.pythonhosted.org/packages/38/71/3b932df36c1a044d397a1f92d1cf91ee0a503d91e470cbd670aa66b07ed0/markdown-it-py-3.0.0.tar.gz", upload-time = 2023-06-03T06:41:14Z, size = 74596, hashes = { sha256 = "e3f60a94fa066dc52ec76661e37c851cb232d92f9886b15cb560aaada2df8feb" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/42/d7/1ec15b46af6af88f19b8e5ffea08fa375d433c998b8a7639e76935c14f1f/markdown_it_py-3.0.0-py3-none-any.whl", upload-time = 2023-06-03T06:41:11Z, size = 87528, hashes = { sha256 = "355216845c60bd96232cd8d8c40e8f9765cc86f46880e43a8fd22dc1a1a8cab1" } }]
+
+[[packages]]
+name = "mdurl"
+version = "0.1.2"
+index = "https://pypi.org/simple"
+sdist = { url = "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz", upload-time = 2022-08-14T12:40:10Z, size = 8729, hashes = { sha256 = "bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/b3/38/89ba8ad64ae25be8de66a6d463314cf1eb366222074cfda9ee839c56a4b4/mdurl-0.1.2-py3-none-any.whl", upload-time = 2022-08-14T12:40:09Z, size = 9979, hashes = { sha256 = "84008a41e51615a49fc9966191ff91509e3c40b939176e643fd50a5c2196b8f8" } }]
+
+[[packages]]
 name = "nodeenv"
 version = "1.9.1"
 index = "https://pypi.org/simple"
@@ -56,6 +70,13 @@ version = "4.2.0"
 index = "https://pypi.org/simple"
 sdist = { url = "https://files.pythonhosted.org/packages/08/39/679ca9b26c7bb2999ff122d50faa301e49af82ca9c066ec061cfbc0c6784/pre_commit-4.2.0.tar.gz", upload-time = 2025-03-18T21:35:20Z, size = 193424, hashes = { sha256 = "601283b9757afd87d40c4c4a9b2b5de9637a8ea02eaff7adc2d0fb4e04841146" } }
 wheels = [{ url = "https://files.pythonhosted.org/packages/88/74/a88bf1b1efeae488a0c0b7bdf71429c313722d1fc0f377537fbe554e6180/pre_commit-4.2.0-py2.py3-none-any.whl", upload-time = 2025-03-18T21:35:19Z, size = 220707, hashes = { sha256 = "a009ca7205f1eb497d10b845e52c838a98b6cdd2102a6c8e4540e94ee75c58bd" } }]
+
+[[packages]]
+name = "pygments"
+version = "2.19.2"
+index = "https://pypi.org/simple"
+sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", upload-time = 2025-06-21T13:39:12Z, size = 4968631, hashes = { sha256 = "636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", upload-time = 2025-06-21T13:39:07Z, size = 1225217, hashes = { sha256 = "86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b" } }]
 
 [[packages]]
 name = "pyyaml"
@@ -91,6 +112,20 @@ wheels = [
     { name = "pyyaml-6.0.2-cp313-cp313-win32.whl", url = "https://files.pythonhosted.org/packages/14/0d/e2c3b43bbce3cf6bd97c840b46088a3031085179e596d4929729d8d68270/PyYAML-6.0.2-cp313-cp313-win32.whl", upload-time = 2024-08-06T20:33:03Z, size = 140527, hashes = { sha256 = "bc2fa7c6b47d6bc618dd7fb02ef6fdedb1090ec036abab80d4681424b84c1183" } },
     { name = "pyyaml-6.0.2-cp313-cp313-win_amd64.whl", url = "https://files.pythonhosted.org/packages/fa/de/02b54f42487e3d3c6efb3f89428677074ca7bf43aae402517bc7cca949f3/PyYAML-6.0.2-cp313-cp313-win_amd64.whl", upload-time = 2024-08-06T20:33:04Z, size = 156446, hashes = { sha256 = "8388ee1976c416731879ac16da0aff3f63b286ffdd57cdeb95f3f2e085687563" } },
 ]
+
+[[packages]]
+name = "rich"
+version = "14.0.0"
+index = "https://pypi.org/simple"
+sdist = { url = "https://files.pythonhosted.org/packages/a1/53/830aa4c3066a8ab0ae9a9955976fb770fe9c6102117c8ec4ab3ea62d89e8/rich-14.0.0.tar.gz", upload-time = 2025-03-30T14:15:14Z, size = 224078, hashes = { sha256 = "82f1bc23a6a21ebca4ae0c45af9bdbc492ed20231dcb63f297d6d1021a9d5725" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/0d/9b/63f4c7ebc259242c89b3acafdb37b41d1185c07ff0011164674e9076b491/rich-14.0.0-py3-none-any.whl", upload-time = 2025-03-30T14:15:12Z, size = 243229, hashes = { sha256 = "1c9491e1951aac09caffd42f448ee3d04e58923ffe14993f6e83068dc395d7e0" } }]
+
+[[packages]]
+name = "rich-argparse"
+version = "1.7.1"
+index = "https://pypi.org/simple"
+sdist = { url = "https://files.pythonhosted.org/packages/71/a6/34460d81e5534f6d2fc8e8d91ff99a5835fdca53578eac89e4f37b3a7c6d/rich_argparse-1.7.1.tar.gz", upload-time = 2025-05-25T20:20:35Z, size = 38094, hashes = { sha256 = "d7a493cde94043e41ea68fb43a74405fa178de981bf7b800f7a3bd02ac5c27be" } }
+wheels = [{ url = "https://files.pythonhosted.org/packages/31/f6/5fc0574af5379606ffd57a4b68ed88f9b415eb222047fe023aefcc00a648/rich_argparse-1.7.1-py3-none-any.whl", upload-time = 2025-05-25T20:20:33Z, size = 25357, hashes = { sha256 = "a8650b42e4a4ff72127837632fba6b7da40784842f08d7395eb67a9cbd7b4bf9" } }]
 
 [[packages]]
 name = "tomli-w"

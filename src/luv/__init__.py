@@ -7,6 +7,7 @@ Copyright (C) 2025 Skylar Gay
 """
 
 import argparse
+import logging
 import os
 import re
 import shutil
@@ -18,6 +19,37 @@ from functools import lru_cache
 from pathlib import Path
 
 import tomli_w
+from rich.logging import RichHandler
+from rich_argparse import RawDescriptionRichHelpFormatter
+
+
+class RichConditionalLevelFormatter(logging.Formatter):
+    def format(self, record):
+        level = record.levelno
+
+        if level >= logging.ERROR:
+            # Red, bold
+            record.msg = (
+                f'[bold red][{record.levelname}][/bold red] {record.msg}'
+            )
+        elif level >= logging.WARNING:
+            # Yellow, bold
+            record.msg = (
+                f'[bold yellow][{record.levelname}][/bold yellow] {record.msg}'
+            )
+        # INFO and DEBUG are left unchanged (no level shown)
+        return super().format(record)
+
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+logger.propagate = False
+log_format = RichConditionalLevelFormatter('%(message)s')
+console_handler = RichHandler(
+    show_time=False, show_path=False, show_level=False, markup=True
+)
+console_handler.setFormatter(log_format)
+logger.addHandler(console_handler)
 
 
 class PackageResolver:
@@ -195,7 +227,7 @@ class PackageResolver:
         all_packages = self.found_packages | self.explicitly_used
         resolved_packages = set()
 
-        print(f'Resolving {len(all_packages)} packages using tlmgr...')
+        logger.info(f'Resolving {len(all_packages)} packages using tlmgr...')
 
         mw = min(8, max(1, len(all_packages)))
         with ThreadPoolExecutor(max_workers=mw) as executor:
@@ -211,9 +243,11 @@ class PackageResolver:
                     if tex_live_name is not None:
                         resolved_packages.add(tex_live_name)
                         if tex_live_name != package:
-                            print(f'  {package} → {tex_live_name}')
+                            logger.info(f'  {package} → {tex_live_name}')
                 except Exception as e:
-                    print(f'  Warning: Failed to resolve {package}: {e}')
+                    logger.warning(
+                        f'  Warning: Failed to resolve {package}: {e}'
+                    )
 
         # Add automatic dependencies based on detected packages
         all_packages = self.found_packages | self.explicitly_used
@@ -222,7 +256,7 @@ class PackageResolver:
         if 'biblatex' in all_packages:
             self.found_packages.add('logreq')
             self.found_packages.add('etoolbox')
-            print('  Added biblatex dependencies: logreq, etoolbox')
+            logger.info('  Added biblatex dependencies: logreq, etoolbox')
 
         # Return sorted list of unique resolved packages
         return sorted(list(resolved_packages))
@@ -356,7 +390,7 @@ class LaTeXEnvironment:
         if self.exists():
             raise LuvError(f'Environment already exists at {self.luv_dir}')
 
-        print(f'Creating LaTeX environment at {self.luv_dir}')
+        logger.info(f'Creating LaTeX environment at {self.luv_dir}')
 
         # Create directory structure
         self.packages_dir.mkdir(parents=True, exist_ok=True)
@@ -371,7 +405,7 @@ class LaTeXEnvironment:
         if not self.requirements_file.exists():
             self._create_initial_requirements()
 
-        print('Environment created successfully!')
+        logger.info('Environment created successfully!')
 
     def _create_initial_config(self) -> None:
         """Create initial luv.toml configuration."""
@@ -386,7 +420,7 @@ class LaTeXEnvironment:
         with open(self.config_file, 'wb') as f:
             tomli_w.dump(config, f)
 
-        print(f'Created {self.config_file}')
+        logger.info(f'Created {self.config_file}')
 
     def _create_initial_requirements(self) -> None:
         """Create initial latex-requirements.txt."""
@@ -401,15 +435,7 @@ class LaTeXEnvironment:
         ]
 
         self.requirements_file.write_text('\n'.join(initial_packages))
-        print(f'Created {self.requirements_file}')
-
-    def remove(self) -> None:
-        """Remove the LaTeX environment."""
-        if not self.exists():
-            raise LuvError('No environment found to remove')
-
-        shutil.rmtree(self.luv_dir)
-        print(f'Removed environment at {self.luv_dir}')
+        logger.info(f'Created {self.requirements_file}')
 
     def get_config(self) -> dict:
         """Load configuration from luv.toml."""
@@ -452,7 +478,7 @@ class LaTeXEnvironment:
         if not (self.project_root / texfile).exists():
             raise LuvError(f'TeX file not found: {texfile}')
 
-        print(f'Analyzing {texfile} and included files...')
+        logger.info(f'Analyzing {texfile} and included files...')
 
         resolver = PackageResolver(self.project_root)
         packages = resolver.resolve_dependencies(texfile)
@@ -461,9 +487,9 @@ class LaTeXEnvironment:
         existing_requirements = self.get_requirements()
         missing_packages = set(packages) - set(existing_requirements)
 
-        print(f'\nFound {len(packages)} installable packages:')
+        logger.info(f'\nFound {len(packages)} installable packages:')
         if resolver.explicitly_used:
-            print('Explicitly declared packages:')
+            logger.info('Explicitly declared packages:')
             for pkg in sorted(resolver.explicitly_used):
                 if pkg not in resolver.CORE_PACKAGES:
                     resolved_name = resolver.resolve_package_name(pkg)
@@ -478,11 +504,11 @@ class LaTeXEnvironment:
                             if resolved_name != pkg
                             else pkg
                         )
-                        print(f'  {status} {display}')
+                        logger.info(f'  {status} {display}')
 
         suggested_packages = resolver.found_packages - resolver.explicitly_used
         if suggested_packages:
-            print('\nSuggested packages (based on usage patterns):')
+            logger.info('\nSuggested packages (based on usage patterns):')
             for pkg in sorted(suggested_packages):
                 if pkg not in resolver.CORE_PACKAGES:
                     resolved_name = resolver.resolve_package_name(pkg)
@@ -497,15 +523,15 @@ class LaTeXEnvironment:
                             if resolved_name != pkg
                             else pkg
                         )
-                        print(f'  {status} {display}')
+                        logger.info(f'  {status} {display}')
 
         # Show summary of what's missing from requirements
         if missing_packages:
-            print(
+            logger.info(
                 f'\n{len(missing_packages)} packages not in latex-requirements.txt:'
             )
             for pkg in sorted(missing_packages):
-                print(f'  - {pkg}')
+                logger.info(f'  - {pkg}')
 
         # Determine if we should update requirements
         should_update = False
@@ -526,11 +552,11 @@ class LaTeXEnvironment:
                 )
                 should_update = response in ['', 'y', 'yes']
             except (EOFError, KeyboardInterrupt):
-                print('\nSkipping update.')
+                logger.info('\nSkipping update.')
                 should_update = False
         elif missing_packages:
             # Non-interactive mode with missing packages
-            print(
+            logger.info(
                 f"\nUse 'luv resolve --update' to add {len(missing_packages)} missing packages to latex-requirements.txt"
             )
         if should_update:
@@ -552,7 +578,7 @@ class LaTeXEnvironment:
             + '\n'
         )
 
-        print(
+        logger.info(
             f'\nUpdated {self.requirements_file} with {len(all_packages)} packages'
         )
 
@@ -581,7 +607,9 @@ class LaTeXEnvironment:
 
             # init-usertree returns non-zero if already initialized, which is fine
             if result.returncode != 0 and 'already exists' not in result.stderr:
-                print(f'Warning: tlmgr init-usertree returned: {result.stderr}')
+                logger.warning(
+                    f'Warning: tlmgr init-usertree returned: {result.stderr}'
+                )
 
             self._tlmgr_initialized = True
 
@@ -593,22 +621,22 @@ class LaTeXEnvironment:
         if not self.exists():
             raise LuvError("No environment found. Run 'luv init' first.")
 
-        print(f'Installing package: {package_name}')
+        logger.info(f'Installing package: {package_name}')
 
         # First try direct installation
         if self._try_install_package(package_name):
             return True
 
         # If direct installation failed, try to resolve the package dynamically
-        print(f'Package {package_name} not found, searching for it...')
+        logger.info(f'Package {package_name} not found, searching for it...')
         resolver = PackageResolver(self.project_root)
         resolved_package = resolver.resolve_package_name(package_name)
 
         if resolved_package and resolved_package != package_name:
-            print(f'Found {package_name} in package: {resolved_package}')
+            logger.info(f'Found {package_name} in package: {resolved_package}')
             return self._try_install_package(resolved_package)
 
-        print(f'Could not resolve package for: {package_name}')
+        logger.warning(f'Could not resolve package for: {package_name}')
         return False
 
     def _try_install_package(self, package_name: str) -> bool:
@@ -639,18 +667,18 @@ class LaTeXEnvironment:
                 'already installed' in result.stdout
                 or 'already installed' in result.stderr
             ):
-                print(f'Package {package_name} is already installed')
+                logger.info(f'Package {package_name} is already installed')
                 return True
 
             # If that failed but package was installed (updmap error), check if files exist
             if 'updmap' in result.stderr and 'install:' in result.stdout:
-                print(
+                logger.info(
                     f'Package {package_name} installed but font map update failed (this is usually OK)'
                 )
                 return True
 
             # If --no-depends-at-all failed for other reasons, try without special flags
-            print(
+            logger.info(
                 f'Trying alternative installation method for {package_name}...'
             )
             cmd = ['tlmgr', '--usermode', 'install', package_name]
@@ -659,16 +687,16 @@ class LaTeXEnvironment:
             )
 
             if result.returncode == 0:
-                print(f'Successfully installed {package_name}')
+                logger.info(f'Successfully installed {package_name}')
                 return True
             elif (
                 'already installed' in result.stdout
                 or 'already installed' in result.stderr
             ):
-                print(f'Package {package_name} is already installed')
+                logger.info(f'Package {package_name} is already installed')
                 return True
             elif 'updmap' in result.stderr and 'install:' in result.stdout:
-                print(
+                logger.info(
                     f'Package {package_name} installed but font map update failed (this is usually OK)'
                 )
                 return True
@@ -678,10 +706,10 @@ class LaTeXEnvironment:
                 return False  # Package not found, try dynamic resolution
 
             # Other errors
-            print(f'Warning: Could not install {package_name}')
-            print(f'tlmgr output: {result.stdout}')
+            logger.warning(f'Warning: Could not install {package_name}')
+            logger.warning(f'tlmgr output: {result.stdout}')
             if result.stderr:
-                print(f'tlmgr error: {result.stderr}')
+                logger.warning(f'tlmgr error: {result.stderr}')
             return False
 
         except FileNotFoundError:
@@ -690,22 +718,24 @@ class LaTeXEnvironment:
     def install_package(self, package_name: str) -> None:
         """Install a LaTeX package to the local environment using tlmgr with smart resolution."""
         if not self.exists():
-            raise LuvError("No environment found. Run 'luv init' first.")
+            logger.error("No environment found. Run 'luv init' first.")
+            return
 
         # Use smart installation with dynamic package resolution
         success = self.install_package_smart(package_name)
 
         if not success:
-            print(
+            logger.warning(
                 f'Note: Package {package_name} may already be installed or not available in this TeX Live version.'
             )
 
     def remove_package(self, package_name: str) -> None:
         """Remove a LaTeX package from the local environment."""
         if not self.exists():
-            raise LuvError("No environment found. Run 'luv init' first.")
+            logger.error("No environment found. Run 'luv init' first.")
+            return
 
-        print(f'Removing package: {package_name}')
+        logger.info(f'Removing package: {package_name}')
 
         # Set environment to use our local texmf directory
         env = os.environ.copy()
@@ -719,7 +749,7 @@ class LaTeXEnvironment:
             )
 
             if result.returncode == 0:
-                print(f'Successfully removed {package_name}')
+                logger.info(f'Successfully removed {package_name}')
 
                 # Remove from requirements file
                 requirements = self.get_requirements()
@@ -735,19 +765,21 @@ class LaTeXEnvironment:
                         + '\n'
                     )
 
-                    print(f'Removed {package_name} from latex-requirements.txt')
+                    logger.info(
+                        f'Removed {package_name} from latex-requirements.txt'
+                    )
                 return
             elif (
                 'not installed' in result.stdout
                 or 'not installed' in result.stderr
             ):
-                print(f'Package {package_name} is not installed')
+                logger.info(f'Package {package_name} is not installed')
                 return
             else:
-                print(f'Warning: Could not remove {package_name}')
-                print(f'tlmgr output: {result.stdout}')
+                logger.warning(f'Warning: Could not remove {package_name}')
+                logger.warning(f'tlmgr output: {result.stdout}')
                 if result.stderr:
-                    print(f'tlmgr error: {result.stderr}')
+                    logger.warning(f'tlmgr error: {result.stderr}')
 
         except FileNotFoundError:
             raise LuvError('tlmgr not found. Please install TeX Live first.')
@@ -755,20 +787,21 @@ class LaTeXEnvironment:
     def clean(self) -> None:
         """Remove the entire LaTeX environment."""
         if not self.exists():
-            raise LuvError('No environment found to clean')
+            logger.warning('No environment found to clean')
+            return
 
         shutil.rmtree(self.luv_dir)
-        print(f'Cleaned environment at {self.luv_dir}')
+        logger.info(f'Cleaned environment at {self.luv_dir}')
 
     def sync(self) -> None:
         """Install all packages from latex-requirements.txt."""
         requirements = self.get_requirements()
 
         if not requirements:
-            print('No requirements found.')
+            logger.info('No requirements found.')
             return
 
-        print(f'Installing {len(requirements)} packages...')
+        logger.info(f'Installing {len(requirements)} packages...')
 
         # Ensure tlmgr user mode is set up first
         self._setup_tlmgr_user_mode()
@@ -796,25 +829,26 @@ class LaTeXEnvironment:
                     if not success:
                         failed_packages.append(package_name)
                 except Exception as e:
-                    print(f'Failed to install {package_name}: {e}')
+                    logger.warning(f'Failed to install {package_name}: {e}')
                     failed_packages.append(package_name)
 
         if failed_packages:
-            print(
+            logger.warning(
                 f'\nWarning: Failed to install {len(failed_packages)} packages:'
             )
             for pkg in failed_packages:
-                print(f'  - {pkg}')
-            print(
+                logger.warning(f'  - {pkg}')
+            logger.warning(
                 '\nSome packages might have different names in TeX Live or be part of larger schemes.'
             )
         else:
-            print('All packages installed successfully!')
+            logger.info('All packages installed successfully!')
 
     def compile(self, clean: bool = False) -> None:
         """Compile the LaTeX project."""
         if not self.exists():
-            raise LuvError("No environment found. Run 'luv init' first.")
+            logger.error("No environment found. Run 'luv init' first.")
+            return
 
         config = self.get_config()
         project_config = config.get('project', {})
@@ -832,7 +866,7 @@ class LaTeXEnvironment:
         output_path.mkdir(exist_ok=True)
 
         if clean:
-            print('Cleaning build directory...')
+            logger.info('Cleaning build directory...')
             for item in output_path.iterdir():
                 if item.is_file():
                     item.unlink()
@@ -843,7 +877,7 @@ class LaTeXEnvironment:
         env = os.environ.copy()
         env['TEXMFHOME'] = str(self.texmf_dir)
 
-        print(f'Compiling {texfile} with {engine}...')
+        logger.info(f'Compiling {texfile} with {engine}...')
 
         # Detect if bibliography is needed
         has_bibliography = self._has_bibliography(texfile_path)
@@ -851,14 +885,14 @@ class LaTeXEnvironment:
         bibliography_backend = self._get_bibliography_backend(texfile_path)
 
         if has_bibliography and has_citations:
-            print(
+            logger.info(
                 f'Bibliography detected ({bibliography_backend}), running full compilation sequence...'
             )
             success = self._compile_with_bibliography(
                 texfile, output_dir, engine, env, bibliography_backend
             )
         else:
-            print('No bibliography detected, running single pass...')
+            logger.info('No bibliography detected, running single pass...')
             success = self._compile_single_pass(
                 texfile, output_dir, engine, env
             )
@@ -964,14 +998,13 @@ class LaTeXEnvironment:
             )
 
             if result.returncode != 0:
-                print('Compilation failed!')
-                print('STDOUT:', result.stdout)
-                print('STDERR:', result.stderr)
+                logger.error('Compilation failed!')
+                logger.error(f'STDOUT: {result.stdout}')
+                logger.error(f'STDERR: {result.stderr}')
                 return False
             else:
-                # Check for warnings
                 self._check_warnings(result.stdout)
-                print(f'Compilation successful! Output in {output_dir}/')
+                logger.info(f'Compilation successful! Output in {output_dir}/')
                 return True
 
         except FileNotFoundError:
@@ -991,46 +1024,48 @@ class LaTeXEnvironment:
         basename = texfile.replace('.tex', '')
 
         # First LaTeX pass
-        print('  Pass 1: Initial compilation...')
+        logger.info('  Pass 1: Initial compilation...')
         if not self._run_latex_pass(texfile, output_dir, engine, env):
-            print('  Pass 1 failed, stopping compilation')
+            logger.warning('  Pass 1 failed, stopping compilation')
             return False
-        print('  Pass 1 completed successfully')
+        logger.info('  Pass 1 completed successfully')
 
         # Run bibliography processor if .aux file exists and has citations
         aux_file = self.project_root / output_dir / f'{basename}.aux'
         if aux_file.exists():
-            print(f'  Pass 2: Processing bibliography ({backend})...')
+            logger.info(f'  Pass 2: Processing bibliography ({backend})...')
             if backend == 'biber':
                 success = self._run_biber(basename, output_dir, env)
             else:
                 success = self._run_bibtex(basename, output_dir, env)
 
             if not success:
-                print(f'  Warning: {backend} failed, continuing...')
+                logger.warning(f'  Warning: {backend} failed, continuing...')
             else:
-                print('  Pass 2 completed successfully')
+                logger.info('  Pass 2 completed successfully')
         else:
-            print('  No .aux file found, skipping bibliography processing')
+            logger.info(
+                '  No .aux file found, skipping bibliography processing'
+            )
 
         # Second LaTeX pass (resolve bibliography)
-        print('  Pass 3: Resolving references...')
+        logger.info('  Pass 3: Resolving references...')
         if not self._run_latex_pass(texfile, output_dir, engine, env):
-            print('  Pass 3 failed, stopping compilation')
+            logger.warning('  Pass 3 failed, stopping compilation')
             return False
-        print('  Pass 3 completed successfully')
+        logger.info('  Pass 3 completed successfully')
 
         # Third LaTeX pass (resolve cross-references)
-        print('  Pass 4: Final compilation...')
+        logger.info('  Pass 4: Final compilation...')
         result = self._run_latex_pass(
             texfile, output_dir, engine, env, final=True
         )
 
         if result:
-            print('  Pass 4 completed successfully')
-            print(f'Compilation successful! Output in {output_dir}/')
+            logger.info('  Pass 4 completed successfully')
+            logger.info(f'Compilation successful! Output in {output_dir}/')
         else:
-            print('  Pass 4 failed')
+            logger.warning('  Pass 4 failed')
 
         return result
 
@@ -1064,11 +1099,15 @@ class LaTeXEnvironment:
             pdf_file = self.project_root / output_dir / f'{basename}.pdf'
 
             if not pdf_file.exists():
-                print(
-                    f'LaTeX pass failed - no PDF generated (return code {result.returncode})'
+                logger.error(
+                    f'LaTeX compilation failed - no PDF generated (exit code: {result.returncode})'
                 )
-                print('STDOUT:', result.stdout[-1000:])  # Show last 1000 chars
-                print('STDERR:', result.stderr[-1000:])  # Show last 1000 chars
+                if result.stdout:
+                    logger.error('Last 1000 characters of output:')
+                    logger.error(result.stdout[-1000:])
+                if result.stderr:
+                    logger.error('Error output:')
+                    logger.error(result.stderr[-1000:])
                 return False
 
             # PDF exists, but check for serious errors in output
@@ -1076,11 +1115,15 @@ class LaTeXEnvironment:
                 'Fatal error' in result.stdout
                 or 'Emergency stop' in result.stdout
             ):
-                print(
-                    f'LaTeX pass failed with fatal error (return code {result.returncode})'
+                logger.error(
+                    f'LaTeX compilation failed with fatal error (exit code: {result.returncode})'
                 )
-                print('STDOUT:', result.stdout[-1000:])
-                print('STDERR:', result.stderr[-1000:])
+                if result.stdout:
+                    logger.error('Last 1000 characters of output:')
+                    logger.error(result.stdout[-1000:])
+                if result.stderr:
+                    logger.error('Error output:')
+                    logger.error(result.stderr[-1000:])
                 return False
 
             if final:
@@ -1116,25 +1159,35 @@ class LaTeXEnvironment:
                 if result.returncode == 0:
                     return True
                 else:
-                    print(f'Biber failed with return code {result.returncode}')
-                    print('Biber STDOUT:', result.stdout[-500:])
-                    print('Biber STDERR:', result.stderr[-500:])
+                    logger.warning(
+                        f'Biber failed with return code {result.returncode}'
+                    )
+                    if result.stdout:
+                        logger.error('Last 1000 characters of Biber output:')
+                        logger.error(result.stdout[-1000:])
+                    if result.stderr:
+                        logger.error('Error output:')
+                        logger.error(result.stderr[-1000:])
+
                     return False
 
             except FileNotFoundError:
                 continue  # Try next biber command
 
         # If no biber found, fall back to BibTeX
-        print('Biber not found in any location, falling back to BibTeX')
-        print(
-            'WARNING: Your document uses biblatex with biber backend, but biber is not installed.'
+
+        logger.warning(
+            """Biber not found in any location, falling back to BibTeX
+WARNING: Your document uses biblatex with biber backend, but biber is not installed.
+
+Please install biber on your system:
+  • macOS: `brew install biber`
+  • Ubuntu/Debian: `sudo apt install biber`
+  • Windows: Install from CTAN or use TeX Live Manager
+  • Or ensure biber is included in your TeX Live installation
+Falling back to BibTeX may not work correctly with biblatex."""
         )
-        print('Please install biber on your system:')
-        print('  • macOS: brew install biber')
-        print('  • Ubuntu/Debian: sudo apt install biber')
-        print('  • Windows: Install from CTAN or use TeX Live Manager')
-        print('  • Or ensure biber is included in your TeX Live installation')
-        print('Falling back to BibTeX may not work correctly with biblatex.')
+
         return self._run_bibtex(basename, output_dir, env)
 
     def _run_bibtex(self, basename: str, output_dir: str, env: dict) -> bool:
@@ -1151,15 +1204,21 @@ class LaTeXEnvironment:
             )
 
             if result.returncode != 0:
-                print(f'BibTeX failed with return code {result.returncode}')
-                print('BibTeX STDOUT:', result.stdout[-500:])
-                print('BibTeX STDERR:', result.stderr[-500:])
+                logger.warning(
+                    f'BibTeX failed with return code {result.returncode}'
+                )
+                if result.stdout:
+                    logger.error('Last 1000 characters of BibTeX output:')
+                    logger.error(result.stdout[-1000:])
+                if result.stderr:
+                    logger.error('Error output:')
+                    logger.error(result.stderr[-1000:])
                 return False
 
             return True
 
         except FileNotFoundError:
-            print('BibTeX not found, skipping bibliography processing')
+            logger.warning('BibTeX not found, skipping bibliography processing')
             return False
 
     def _check_warnings(self, stdout: str) -> None:
@@ -1185,12 +1244,11 @@ class LaTeXEnvironment:
             warnings.append(
                 'Multiply defined labels - check for duplicate \\label{} commands'
             )
-
         if warnings:
-            print('\nWarnings detected:')
+            logger.warning('\nWarnings detected:')
             for warning in warnings:
-                print(f'  • {warning}')
-            print(
+                logger.warning(f'  • {warning}')
+            logger.warning(
                 '\nTo debug: check the .log file in the build directory for details.'
             )
 
@@ -1210,13 +1268,12 @@ def find_project_root() -> Path | None:
 def main():
     parser = argparse.ArgumentParser(
         description='luv - LaTeX Universal Virtualizer\n\nA tool for managing LaTeX projects with isolated package environments.',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
+        formatter_class=RawDescriptionRichHelpFormatter,
         epilog="""
 Examples:
   luv init                          # Initialize new LaTeX project
   luv init --texfile manuscript.tex # Initialize with custom tex file
-  luv resolve                       # Analyze and show required packages (interactive)
-  luv resolve --update              # Update latex-requirements.txt with found packages
+  luv resolve                       # Analyze and update latex-requirements.txt with found packages
   luv resolve --dry-run             # Show packages without updating or prompting
   luv sync                          # Install packages from latex-requirements.txt
   luv add amsmath hyperref          # Add packages to requirements and install
@@ -1357,9 +1414,9 @@ Project Structure:
                 config['project']['texfile'] = args.texfile
                 config['project']['engine'] = args.engine
                 env.update_config(config)
-                print(f'Set texfile to {args.texfile}')
+                logger.info(f'Set texfile to {args.texfile}')
                 if args.engine != 'pdflatex':
-                    print(f'Set engine to {args.engine}')
+                    logger.info(f'Set engine to {args.engine}')
 
         else:
             # Find project root for other commands
@@ -1397,7 +1454,7 @@ Project Structure:
 
                     # Skip core packages
                     if resolved_name is None:
-                        print(
+                        logger.info(
                             f'Skipping {package} (core LaTeX package, no installation needed)'
                         )
                         continue
@@ -1411,7 +1468,7 @@ Project Structure:
                             env.requirements_file.read_text()
                             + f'{resolved_name}\n'
                         )
-                        print(
+                        logger.info(
                             f'Added {resolved_name} to latex-requirements.txt'
                         )
 
@@ -1423,7 +1480,7 @@ Project Structure:
 
                     # Skip core packages
                     if resolved_name is None:
-                        print(
+                        logger.info(
                             f'Skipping {package} (core LaTeX package, cannot be removed)'
                         )
                         continue
@@ -1436,37 +1493,29 @@ Project Structure:
             elif args.command == 'compile':
                 env.compile(clean=args.clean)
 
-            elif args.command == 'remove':
-                env.remove()
-
             elif args.command == 'info':
                 config = env.get_config()
                 requirements = env.get_requirements()
 
-                print(f'Project root: {project_root}')
-                print(f'Environment: {env.luv_dir}')
-                print(
-                    f'TeX file: {config.get("project", {}).get("texfile", "main.tex")}'
+                logger.info(
+                    f"""Project root: {project_root}
+Environment: {env.luv_dir}
+TeX file: {config.get('project', {}).get('texfile', 'main.tex')}
+Engine: {config.get('project', {}).get('engine', 'pdflatex')}
+Output dir: {config.get('project', {}).get('output_dir', 'build')}
+Packages: {len(requirements)} installed"""
                 )
-                print(
-                    f'Engine: {config.get("project", {}).get("engine", "pdflatex")}'
-                )
-                print(
-                    f'Output dir: {config.get("project", {}).get("output_dir", "build")}'
-                )
-                print(f'Packages: {len(requirements)} installed')
                 if requirements:
                     for pkg in requirements:
-                        print(f'  - {pkg}')
-
+                        logger.info(f'  - {pkg}')
     except LuvError as e:
-        print(f'Error: {e}', file=sys.stderr)
+        logger.error(f'Error: {e}', exc_info=sys.stderr)
         sys.exit(1)
     except KeyboardInterrupt:
-        print('\nOperation cancelled.')
+        logger.info('\nOperation cancelled.')
         sys.exit(1)
     except Exception as e:
-        print(f'Unexpected error: {e}', file=sys.stderr)
+        logger.error(f'Unexpected error: {e}', exc_info=sys.stderr)
         sys.exit(1)
 
 
