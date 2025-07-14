@@ -867,11 +867,8 @@ class LaTeXEnvironment:
 
         if clean:
             logger.info('Cleaning build directory...')
-            for item in output_path.iterdir():
-                if item.is_file():
-                    item.unlink()
-                elif item.is_dir():
-                    shutil.rmtree(item)
+            shutil.rmtree(output_path)
+            os.makedirs(output_path)
 
         # Set TEXMFHOME to use our local packages
         env = os.environ.copy()
